@@ -1,6 +1,6 @@
 package com.amp.analysis
 
-import com.amp.analysis.ProgramTransformer.{findOutputBounds, getAST, methodFilter}
+import com.amp.analysis.ProgramTransformer.{analyzeCodeBlock, getAST, methodFilter}
 import com.amp.examples.TestClass
 import org.scalatest.{FlatSpec, Matchers}
 import spoon.reflect.declaration.CtMethod
@@ -14,8 +14,9 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
     val (_, ctModel) = getAST(filePath)
     val elements = ctModel.getElements[CtMethod[Any]](methodFilter).asScala.toList
     val x = elements.head.asInstanceOf[CtMethod[Double]]
+
     val s1 = System.currentTimeMillis()
-    val (estimatedOutputs, _) = findOutputBounds(x)
+    val estimatedOutputs = analyzeCodeBlock(x)
     val s2 = System.currentTimeMillis()
     val runtime1 = s2 - s1
 
@@ -24,7 +25,8 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
     val s4 = System.currentTimeMillis()
     val runtime2 = s4 - s3
 
-    assert(estimatedOutputs.head == actualOutput)
+    println(estimatedOutputs)
+    assert(estimatedOutputs("returnVal0") == actualOutput)
     assert(runtime1 * 100 < runtime2)
   }
 }

@@ -7,10 +7,15 @@ public class TestClass {
     public double testMethod() throws InterruptedException {
         double x = 1.0;
         x = 0.0;
-        for(int j = 0; j < 100; j++){
-            Thread.sleep(10);
+        for(int j = 0; j < 4; j++){
+            Thread.sleep(1000);
             x += j;
+            return 10.0;
         }
         return x;
+    }
+
+    public void foo(){
+
     }
 }
