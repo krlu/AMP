@@ -25,8 +25,7 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
     val s4 = System.currentTimeMillis()
     val runtime2 = s4 - s3
 
-    println(estimatedOutputs)
     assert(estimatedOutputs("returnVal0") == actualOutput)
-    assert(runtime1 * 100 < runtime2)
+    assert(runtime1 * 10 < runtime2)
   }
 }

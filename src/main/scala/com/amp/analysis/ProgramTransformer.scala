@@ -66,10 +66,9 @@ object ProgramTransformer{
   def analyzeCodeBlock(holder: CtBodyHolder, scopeVariables: Map[String, Double] = Map.empty[String, Double]): Map[String, Double] = {
     var toReturnVars = scopeVariables
     if(Recognizer.recognize[CtFor](holder)) {
-      println("for loop")
       val forBlock = holder.asInstanceOf[CtFor]
-      val ((initVarName, initValue), exitValue, update) = getForLoopSignature(forBlock)
-      val isPostInc = update.getKind == UnaryOperatorKind.POSTINC
+      val ((initVarName, initValue), exitValue, updateOperators) = getForLoopSignature(forBlock)
+      val isPostInc = updateOperators.getKind == UnaryOperatorKind.POSTINC
       forBlock.getBody.asInstanceOf[CtBlock[Double]].forEach { statement =>
         if(Recognizer.recognize[CtInvocation[AnyVal]](statement)) {
           val methodCall = statement.asInstanceOf[CtInvocation[Any]].getExecutable
@@ -90,9 +89,9 @@ object ProgramTransformer{
             return toReturnVars
         }
       }
+
     }
     if(Recognizer.recognize[CtMethod[Double]](holder)){
-      println("method")
       val method = holder.asInstanceOf[CtMethod[Double]]
       val body: CtBlock[Double] = method.getBody
       body.forEach{ statement =>
