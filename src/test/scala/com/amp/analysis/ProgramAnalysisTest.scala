@@ -34,7 +34,7 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
     val filePath = "src/main/java/com/amp/examples/TestClass2.java"
     val (_, ctModel) = getAST(filePath)
     val elements = ctModel.getElements(methodFilter).asScala.toList
-    val blocks = ProgramTransformer.getBLocks(elements.head)
+    val blocks = ProgramTransformer.getBLocks(elements.head.getBody)
     assert(blocks.size == 2)
     assert(blocks(0) == blocks(1))
   }

@@ -164,11 +164,11 @@ object ProgramTransformer{
 
   /**
     * Finds all code blocks in a give method, used to support refactoring
-    * @param method - input method
+    * @param codeBlock - input source code
     * @return list of CtBlock
     */
-  def getBLocks(method: CtMethod[Any]): List[CtBlock[Any]] = {
-    method.getBody.getDirectChildren.asScala.toList.flatMap { x =>
+  def getBLocks(codeBlock: CtBlock[Any]): List[CtBlock[Any]] = {
+    codeBlock.getDirectChildren.asScala.toList.flatMap { x =>
       if (Recognizer.recognize[CtIf](x)) {
         val ifStatement = x.asInstanceOf[CtIf]
         val thenBlock = ifStatement.getThenStatement.asInstanceOf[CtBlock[Any]]
