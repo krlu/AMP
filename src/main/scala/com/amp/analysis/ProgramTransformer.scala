@@ -89,7 +89,6 @@ object ProgramTransformer{
             return toReturnVars
         }
       }
-
     }
     if(Recognizer.recognize[CtMethod[Double]](holder)){
       val method = holder.asInstanceOf[CtMethod[Double]]
@@ -161,6 +160,28 @@ object ProgramTransformer{
         constants = constants :+ scopeVariables(child.toString)
     }
     (constants, bounds)
+  }
+
+  /**
+    * Finds all code blocks in a give method, used to support refactoring
+    * @param method - input method
+    * @return list of CtBlock
+    */
+  def getBLocks(method: CtMethod[Any]): List[CtBlock[Any]] = {
+    method.getBody.getDirectChildren.asScala.toList.flatMap { x =>
+      if (Recognizer.recognize[CtIf](x)) {
+        val ifStatement = x.asInstanceOf[CtIf]
+        val thenBlock = ifStatement.getThenStatement.asInstanceOf[CtBlock[Any]]
+        val elseBlock = ifStatement.getElseStatement.asInstanceOf[CtBlock[Any]]
+        List(thenBlock, elseBlock).filter(_ != null)
+      }
+      else if (Recognizer.recognize[CtLoop](x)) {
+        val loopStatement = x.asInstanceOf[CtLoop]
+        List(loopStatement.getBody.asInstanceOf[CtBlock[Any]])
+      }
+      else if (Recognizer.recognize[CtBlock[Any]](x)) List(x.asInstanceOf[CtBlock[Any]])
+      else List.empty[CtBlock[Any]]
+    }
   }
 }
 

@@ -3,6 +3,7 @@ package com.amp.analysis
 import com.amp.analysis.ProgramTransformer.{analyzeCodeBlock, getAST, methodFilter}
 import com.amp.examples.TestClass
 import org.scalatest.{FlatSpec, Matchers}
+import spoon.reflect.code.{CtBlock, CtFor, CtIf, CtLoop, CtWhile}
 import spoon.reflect.declaration.CtMethod
 
 import scala.jdk.CollectionConverters._
@@ -27,5 +28,14 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
 
     assert(estimatedOutputs("returnVal0") == actualOutput)
     assert(runtime1 * 10 < runtime2)
+  }
+
+  "Program output Analyzer" should "automatically refactor method" in {
+    val filePath = "src/main/java/com/amp/examples/TestClass2.java"
+    val (_, ctModel) = getAST(filePath)
+    val elements = ctModel.getElements(methodFilter).asScala.toList
+    val blocks = ProgramTransformer.getBLocks(elements.head)
+    assert(blocks.size == 2)
+    assert(blocks(0) == blocks(1))
   }
 }
