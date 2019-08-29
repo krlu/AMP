@@ -5,8 +5,11 @@ import spoon.Launcher
 import spoon.reflect.CtModel
 import spoon.reflect.code._
 import spoon.reflect.cu.CompilationUnit
-import spoon.reflect.declaration.{CtElement, CtMethod}
+import spoon.reflect.declaration.{CtElement, CtExecutable, CtMethod, CtParameter, CtVariable, ModifierKind}
+import spoon.reflect.factory.Factory
+import spoon.reflect.reference.CtExecutableReference
 import spoon.reflect.visitor.filter.TypeFilter
+import spoon.support.reflect.reference.CtArrayTypeReferenceImpl
 
 import scala.jdk.CollectionConverters._
 
@@ -17,8 +20,16 @@ object ProgramTransformer{
   val returnFilter = filter(classOf[CtReturn[Any]])
   val assignmentFilter = filter(classOf[CtAssignment[Any, Any]])
   val localVarFilter = filter(classOf[CtLocalVariable[Any]])
+  val variable = filter(classOf[CtVariable[Any]])
 
   private def filter[T <: CtElement](c: Class[T]): TypeFilter[T] = new TypeFilter[T](c)
+
+  def cloneAST(inputPath: String): (CompilationUnit, CtModel) = {
+    val (cu, model) = getAST(inputPath)
+    val pathToCopy = s"${inputPath.split("/").last.replace(".java", "_copy.java")}"
+    printFullClass(cu, model, pathToCopy)
+    getAST(pathToCopy)
+  }
 
   /**
     * Obtains the Abstract Syntax Tree and Compilation Unit of the input java program
@@ -28,7 +39,7 @@ object ProgramTransformer{
     *         cu - compilation unit, contains package info and list of imported libraries
     *         model - the AST of the input program
     */
-  def getAST(inputPath: String): (CompilationUnit, CtModel) ={
+  def getAST(inputPath: String): (CompilationUnit, CtModel) = {
     val launcher = new Launcher
     launcher.addInputResource(inputPath)
     launcher.getEnvironment.setAutoImports(true)
@@ -160,6 +171,56 @@ object ProgramTransformer{
         constants = constants :+ scopeVariables(child.toString)
     }
     (constants, bounds)
+  }
+
+  /**
+    * @param method - original methods
+    * @return - refactored helper functions
+    */
+  def refactorMethod(method: CtMethod[Any], methodClone: CtMethod[Any]): List[CtMethod[Any]] = {
+    val blocks = getBLocks(method.getBody)
+    val clonedBlocks = getBLocks(methodClone.getBody)
+    val uniqueBlocks = blocks.distinct
+    val uniqueMultiBlocks = uniqueBlocks.filter { block => blocks.count(_ == block) > 1 }
+    val uniqueClonedBlocks = clonedBlocks.distinct
+    val blockToMethod: Map[String, CtMethod[Any]] = uniqueMultiBlocks.indices.map{ i =>
+      uniqueClonedBlocks(i).toString -> createHelperMethod(uniqueMultiBlocks(i), s"${method.getSimpleName}Helper$i")
+    }.toMap
+    val scopedVariables = method.getElements(variable).asScala.toList.foreach(v => println(v.getClass))
+    clonedBlocks.foreach(block => updateBlocks(block, blockToMethod(block.toString).getSimpleName))
+    blockToMethod.values.toList
+  }
+
+  private def updateBlocks(block: CtBlock[Any], helperMethodName: String): Unit = {
+    block.getStatements.asScala.toList.foreach(block.removeStatement)
+    val executable = block.getFactory.createExecutableReference()
+    executable.setSimpleName(helperMethodName)
+    val methodCall = block.getFactory.createInvocation()
+    methodCall.setExecutable(executable)
+    block.addStatement(methodCall)
+  }
+
+  private def createHelperMethod(block: CtBlock[Any], helperMethodName: String): CtMethod[Any] = {
+    val factory: Factory = block.getFactory
+    val method: CtMethod[Any] = factory.createMethod()
+    var paramsToReturn = List.empty[String]
+    method.setSimpleName(helperMethodName)
+    block.getElements(assignmentFilter).asScala.toList.foreach{ a =>
+      val varName: String = a.getAssigned.asInstanceOf[CtVariableAccess[Any]].getVariable.getSimpleName
+      val param: CtParameter[Any] = factory.createParameter[Any]()
+      param.setType(a.getAssigned.getType)
+      param.setSimpleName(varName)
+      paramsToReturn = paramsToReturn :+ varName
+      method.addParameter[CtExecutable[Any]](param)
+    }
+    val returnStatement = factory.createReturn[Any]()
+    val variables = factory.createLiteralArray[Any](paramsToReturn.toArray).asInstanceOf[CtExpression[Any]]
+    returnStatement.setReturnedExpression(variables)
+    block.addStatement(returnStatement)
+    method.setBody(block)
+    method.addModifier(ModifierKind.PRIVATE)
+    method.setType(new CtArrayTypeReferenceImpl[Any]())
+    method
   }
 
   /**

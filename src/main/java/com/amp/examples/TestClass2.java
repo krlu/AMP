@@ -1,7 +1,9 @@
 package com.amp.examples;
 
 public class TestClass2 {
-    public static void foo(int i, int j){
+    public void foo(int i, int j){
+        int k = 0;
+        bar();
         if(j > 0){
             i += 1;
             j += 1;
@@ -12,5 +14,8 @@ public class TestClass2 {
             j += 1;
             System.out.println(i);
         }
+    }
+    protected void bar(){
+
     }
 }
