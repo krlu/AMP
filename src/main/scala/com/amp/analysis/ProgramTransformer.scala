@@ -5,9 +5,9 @@ import spoon.Launcher
 import spoon.reflect.CtModel
 import spoon.reflect.code._
 import spoon.reflect.cu.CompilationUnit
-import spoon.reflect.declaration.{CtElement, CtExecutable, CtMethod, CtParameter, CtVariable, ModifierKind}
+import spoon.reflect.declaration._
 import spoon.reflect.factory.Factory
-import spoon.reflect.reference.CtExecutableReference
+import spoon.reflect.reference.CtVariableReference
 import spoon.reflect.visitor.filter.TypeFilter
 import spoon.support.reflect.reference.CtArrayTypeReferenceImpl
 
@@ -28,7 +28,10 @@ object ProgramTransformer{
     val (cu, model) = getAST(inputPath)
     val pathToCopy = s"${inputPath.split("/").last.replace(".java", "_copy.java")}"
     printFullClass(cu, model, pathToCopy)
-    getAST(pathToCopy)
+    val ast = getAST(pathToCopy)
+    val file = new File(pathToCopy)
+    file.delete()
+    ast
   }
 
   /**
@@ -186,31 +189,51 @@ object ProgramTransformer{
     val blockToMethod: Map[String, CtMethod[Any]] = uniqueMultiBlocks.indices.map{ i =>
       uniqueClonedBlocks(i).toString -> createHelperMethod(uniqueMultiBlocks(i), s"${method.getSimpleName}Helper$i")
     }.toMap
-    val scopedVariables = method.getElements(variable).asScala.toList.foreach(v => println(v.getClass))
-    clonedBlocks.foreach(block => updateBlocks(block, blockToMethod(block.toString).getSimpleName))
+    clonedBlocks.indices.foreach{ i =>
+      val clonedBlock = clonedBlocks(i)
+      val originalBlock = blocks(i)
+      updateBlocks(clonedBlock, originalBlock, blockToMethod(clonedBlock.toString))
+    }
     blockToMethod.values.toList
   }
 
-  private def updateBlocks(block: CtBlock[Any], helperMethodName: String): Unit = {
-    block.getStatements.asScala.toList.foreach(block.removeStatement)
-    val executable = block.getFactory.createExecutableReference()
-    executable.setSimpleName(helperMethodName)
-    val methodCall = block.getFactory.createInvocation()
+  /**
+    * Replace block contents with method call to helper method
+    * @param clonedBlock - cloned block to be modified
+    * @param originalBlock - original block, contains references to original variables in scope
+    * @param helperMethod - new helper method
+    */
+  private def updateBlocks(clonedBlock: CtBlock[Any], originalBlock: CtBlock[Any], helperMethod: CtMethod[Any]): Unit = {
+    val variableWrites = originalBlock.getStatements.asScala.toList
+      .filter(Recognizer.recognize[CtOperatorAssignment[Any, Any]])
+      .map(_.asInstanceOf[CtOperatorAssignment[Any, Any]].getAssigned)
+    clonedBlock.getStatements.asScala.toList.foreach(clonedBlock.removeStatement)
+    val factory = clonedBlock.getFactory
+    val executable = factory.createExecutableReference()
+    executable.setSimpleName(helperMethod.getSimpleName)
+    val methodCall = clonedBlock.getFactory.createInvocation()
     methodCall.setExecutable(executable)
-    block.addStatement(methodCall)
+    variableWrites.foreach(methodCall.addArgument)
+    clonedBlock.addStatement(methodCall)
   }
 
+  /**
+    * @param block - original block
+    * @param helperMethodName - name of helperMethod
+    * @return new helper method containing original block and parameters as variables defined outside the block
+    */
   private def createHelperMethod(block: CtBlock[Any], helperMethodName: String): CtMethod[Any] = {
     val factory: Factory = block.getFactory
     val method: CtMethod[Any] = factory.createMethod()
-    var paramsToReturn = List.empty[String]
+    var paramsToReturn = List.empty[CtVariableReference[Any]]
     method.setSimpleName(helperMethodName)
     block.getElements(assignmentFilter).asScala.toList.foreach{ a =>
+      val variable = a.getAssigned.asInstanceOf[CtVariableAccess[Any]].getVariable
       val varName: String = a.getAssigned.asInstanceOf[CtVariableAccess[Any]].getVariable.getSimpleName
       val param: CtParameter[Any] = factory.createParameter[Any]()
       param.setType(a.getAssigned.getType)
       param.setSimpleName(varName)
-      paramsToReturn = paramsToReturn :+ varName
+      paramsToReturn = paramsToReturn :+ variable
       method.addParameter[CtExecutable[Any]](param)
     }
     val returnStatement = factory.createReturn[Any]()

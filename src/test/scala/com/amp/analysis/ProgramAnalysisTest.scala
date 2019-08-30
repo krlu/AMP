@@ -31,8 +31,9 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
 
   "Program output Analyzer" should "automatically refactor method" in {
     val filePath = "src/main/java/com/amp/examples/TestClass2.java"
+    val outPath = "TestClass2Transformed.java"
     val (_, ctModelOriginal) = getAST(filePath)
-    val (_, ctModelCloned) = cloneAST(filePath)
+    val (cu, ctModelCloned) = cloneAST(filePath)
     val elements = ctModelOriginal.getElements(methodFilter).asScala.toList
     val clonedElements = ctModelCloned.getElements(methodFilter).asScala.toList
     val originalMethod = elements.head
@@ -51,6 +52,5 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
     }
     val clonedCode = ctModelCloned.getAllTypes.asScala.head
     helperMethods.foreach(clonedCode.addMethod)
-    println(clonedCode)
   }
 }
