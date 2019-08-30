@@ -176,8 +176,19 @@ object ProgramTransformer{
     (constants, bounds)
   }
 
+  def refactorMethodsForClass(filePath: String): CtType[_] = {
+    val (_, ctModelOriginal) = getAST(filePath)
+    val (_, ctModelCloned) = cloneAST(filePath)
+    val methods = ctModelOriginal.getElements(methodFilter).asScala.toList
+    val clonedMethods = ctModelCloned.getElements(methodFilter).asScala.toList
+    val helperMethods = (methods zip clonedMethods).flatMap { case (a, b) => refactorMethod(a, b) }
+    val clonedCode = ctModelCloned.getAllTypes.asScala.head
+    helperMethods.foreach(clonedCode.addMethod)
+    clonedCode
+  }
+
   /**
-    * @param method - original methods
+    * @param method - original method
     * @return - refactored helper functions
     */
   def refactorMethod(method: CtMethod[Any], methodClone: CtMethod[Any]): List[CtMethod[Any]] = {
