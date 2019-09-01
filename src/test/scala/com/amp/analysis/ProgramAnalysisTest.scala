@@ -34,18 +34,6 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
   "Program output Analyzer" should "support refactoring method" in {
     for(testNum <- 2 to 3) {
       val filePath = s"src/main/java/com/amp/examples/TestClass$testNum.java"
-      val (_, ctModelOriginal) = getAST(filePath)
-      val (_, ctModelCloned) = cloneAST(filePath)
-      val elements = ctModelOriginal.getElements(methodFilter).asScala.toList
-      val clonedElements = ctModelCloned.getElements(methodFilter).asScala.toList
-      val originalMethod = elements.head
-      val clonedMethod = clonedElements.head
-      val blocks = ProgramTransformer.getBLocks(originalMethod.getBody)
-      assert(blocks.size == 2)
-      assert(blocks(0) == blocks(1))
-      val helperMethods = refactorMethod(originalMethod, clonedMethod)
-      assert(helperMethods.size == 1)
-
       val refactoredClass = refactorMethodsForClass(filePath)
       val tempFilePath = "temp.txt"
       val fw = new FileWriter(tempFilePath)

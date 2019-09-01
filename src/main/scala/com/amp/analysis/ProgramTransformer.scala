@@ -9,8 +9,8 @@ import spoon.reflect.declaration._
 import spoon.reflect.factory.Factory
 import spoon.reflect.reference.{CtLocalVariableReference, CtTypeReference, CtVariableReference}
 import spoon.reflect.visitor.filter.TypeFilter
-import spoon.support.reflect.code.{CtExpressionImpl, CtVariableWriteImpl}
-import spoon.support.reflect.reference.{CtArrayTypeReferenceImpl, CtLocalVariableReferenceImpl, CtTypeReferenceImpl, CtVariableReferenceImpl}
+import spoon.support.reflect.code.CtVariableWriteImpl
+import spoon.support.reflect.reference.CtLocalVariableReferenceImpl
 
 import scala.jdk.CollectionConverters._
 
@@ -165,16 +165,16 @@ object ProgramTransformer{
     * @param scopeVariables - variables within scope of this returns statement
     * @return (List[Double], List[(Double,Double)) - Possible Outputs
     */
-  def handleReturnStatement(statement: CtReturn[Double], scopeVariables: Map[String, Double] = Map.empty[String, Double]):
-  (List[Double], List[(Double, Double)]) = {
-    var constants: List[Double] = List.empty[Double]
-    val bounds: List[(Double, Double)] = List.empty[(Double, Double)]
+  def handleReturnStatement[T](statement: CtReturn[T], scopeVariables: Map[String, T] = Map.empty[String, T]):
+  (List[T], List[(T, T)]) = {
+    var constants: List[T] = List.empty[T]
+    val bounds: List[(T, T)] = List.empty[(T, T)]
     val child = statement.getDirectChildren.get(0)
     // find all return statements with literals
-    if(Recognizer.recognize[CtLiteral[Double]](child))
-      constants = constants ++ List(child.asInstanceOf[CtLiteral[Double]].getValue)
+    if(Recognizer.recognize[CtLiteral[T]](child))
+      constants = constants ++ List(child.asInstanceOf[CtLiteral[T]].getValue)
     // find all return statements with variable references
-    if(Recognizer.recognize[CtVariableRead[Double]](child)){
+    if(Recognizer.recognize[CtVariableRead[T]](child)){
       if(scopeVariables.contains(child.toString))
         constants = constants :+ scopeVariables(child.toString)
     }
@@ -195,7 +195,7 @@ object ProgramTransformer{
     val (_, ctModelCloned) = cloneAST(filePath)
     val methods = ctModelOriginal.getElements(methodFilter).asScala.toList
     val clonedMethods = ctModelCloned.getElements(methodFilter).asScala.toList
-    val helperMethods = (methods zip clonedMethods).flatMap { case (a, b) => refactorMethod(a, b) }
+    val helperMethods = (methods zip clonedMethods).flatMap { case (a, b) => refactorMethod[Any](a, b) }
     val clonedCode = ctModelCloned.getAllTypes.asScala.head
     helperMethods.foreach(clonedCode.addMethod)
     clonedCode
@@ -206,23 +206,23 @@ object ProgramTransformer{
     * @param methodClone - method clone (this is the method we will refactor)
     * @return - refactored helper functions
     */
-  def refactorMethod(method: CtMethod[Any], methodClone: CtMethod[Any]): List[CtMethod[Any]] = {
-    val blocks = getBLocks(method.getBody)
-    val clonedBlocks = getBLocks(methodClone.getBody)
+  def refactorMethod[T](method: CtMethod[T], methodClone: CtMethod[T]): List[CtMethod[T]] = {
+    val blocks = getBLocks[T](method.getBody)
+    val clonedBlocks = getBLocks[T](methodClone.getBody)
     val uniqueBlocks = blocks.distinct
     val uniqueMultiBlocks = uniqueBlocks.filter { block => blocks.count(_ == block) > 1 }
     val uniqueClonedBlocks = clonedBlocks.distinct
-    val blockToMethod: Map[String, CtMethod[Any]] = uniqueMultiBlocks.indices.map{ i =>
+    val blockToMethod: Map[String, CtMethod[T]] = uniqueMultiBlocks.indices.map{ i =>
       val block = uniqueClonedBlocks(i)
       val innerScopeVars = block.getElements(localVarFilter).asScala.toList.map(_.getReference.getSimpleName)
       val allScopeVars = List(variableReferenceFilter, variableReadFilter, variableWriteFilter)
         .flatMap(block.getElements(_).asScala.toList)
-        .filterNot(e => Recognizer.recognize[CtFieldRead[Any]](e))
-      val relevantVarNames: List[(CtTypeReference[Any], String)] = allScopeVars
+        .filterNot(e => Recognizer.recognize[CtFieldRead[T]](e))
+      val relevantVarNames: List[(CtTypeReference[T], String)] = allScopeVars
         .filterNot(e => innerScopeVars.contains(e.toString))
-        .map(e => (e.getReferencedTypes.asScala.toList.head.asInstanceOf[CtTypeReference[Any]], e.toString))
+        .map(e => (e.getReferencedTypes.asScala.toList.head.asInstanceOf[CtTypeReference[T]], e.toString))
         .distinct.sortBy(_._2)
-      block.toString -> createHelperMethod(uniqueMultiBlocks(i), relevantVarNames, method.getType, s"${method.getSimpleName}Helper$i")
+      block.toString -> createHelperMethod[T](uniqueMultiBlocks(i), relevantVarNames, method.getType, s"${method.getSimpleName}Helper$i")
     }.toMap
     clonedBlocks.indices.foreach{ i =>
       val clonedBlock = clonedBlocks(i)
@@ -238,7 +238,7 @@ object ProgramTransformer{
     * @param originalBlock - original block, contains references to original variables in scope
     * @param helperMethod - new helper method
     */
-  private def updateBlocks(clonedBlock: CtBlock[Any], originalBlock: CtBlock[Any], helperMethod: CtMethod[Any]): Unit = {
+  private def updateBlocks[T](clonedBlock: CtBlock[T], originalBlock: CtBlock[T], helperMethod: CtMethod[T]): Unit = {
     clonedBlock.getStatements.asScala.toList.foreach(clonedBlock.removeStatement)
     val factory = clonedBlock.getFactory
     val executable = factory.createExecutableReference()
@@ -246,9 +246,9 @@ object ProgramTransformer{
     val methodCall = clonedBlock.getFactory.createInvocation()
     methodCall.setExecutable(executable)
     val variables = helperMethod.getParameters.asScala.toList.map{ param =>
-      val varRef: CtVariableReference[Any] = new CtLocalVariableReferenceImpl()
+      val varRef: CtVariableReference[T] = new CtLocalVariableReferenceImpl()
       varRef.setSimpleName(param.getSimpleName)
-      val varWrite = new CtVariableWriteImpl[Any]()
+      val varWrite = new CtVariableWriteImpl[T]()
       varWrite.setVariable(varRef)
       varWrite
     }
@@ -263,24 +263,24 @@ object ProgramTransformer{
     * @param helperMethodName - name of helperMethod
     * @return new helper method containing original block and parameters as variables defined outside the block
     */
-  private def createHelperMethod(block: CtBlock[Any], relevantVarNames: List[(CtTypeReference[Any], String)],
-                                 returnType: CtTypeReference[Any], helperMethodName: String): CtMethod[Any] = {
+  private def createHelperMethod[T](block: CtBlock[T], relevantVarNames: List[(CtTypeReference[T], String)],
+                                 returnType: CtTypeReference[T], helperMethodName: String): CtMethod[T] = {
     val factory: Factory = block.getFactory
-    val method: CtMethod[Any] = factory.createMethod()
+    val method: CtMethod[T] = factory.createMethod()
     method.setSimpleName(helperMethodName)
     relevantVarNames.foreach{ case (typeRef, name) =>
-      val param: CtParameter[Any] = factory.createParameter[Any]()
+      val param: CtParameter[T] = factory.createParameter[T]()
       param.setSimpleName(name)
       param.setType(typeRef)
-      method.addParameter[CtExecutable[Any]](param)
+      method.addParameter[CtExecutable[T]](param)
     }
     if(returnType.getSimpleName != "void") {
-      var paramsToReturn = List.empty[CtVariableReference[Any]]
+      var paramsToReturn = List.empty[CtVariableReference[T]]
       block.getElements(assignmentFilter).asScala.toList.foreach { a =>
-        paramsToReturn = paramsToReturn :+ a.getAssigned.asInstanceOf[CtVariableAccess[Any]].getVariable
+        paramsToReturn = paramsToReturn :+ a.getAssigned.asInstanceOf[CtVariableAccess[T]].getVariable
       }
-      val returnStatement = factory.createReturn[Any]()
-      val variables = factory.createLiteralArray[Any](paramsToReturn.toArray).asInstanceOf[CtExpression[Any]]
+      val returnStatement = factory.createReturn[T]()
+      val variables = factory.createLiteralArray(paramsToReturn.toArray).asInstanceOf[CtExpression[T]]
       returnStatement.setReturnedExpression(variables)
       block.addStatement(returnStatement)
     }
@@ -295,20 +295,20 @@ object ProgramTransformer{
     * @param codeBlock - input source code
     * @return list of CtBlock
     */
-  def getBLocks(codeBlock: CtBlock[Any]): List[CtBlock[Any]] = {
+  private def getBLocks[T](codeBlock: CtBlock[T]): List[CtBlock[T]] = {
     codeBlock.getDirectChildren.asScala.toList.flatMap { x =>
       if (Recognizer.recognize[CtIf](x)) {
         val ifStatement = x.asInstanceOf[CtIf]
-        val thenBlock = ifStatement.getThenStatement.asInstanceOf[CtBlock[Any]]
-        val elseBlock = ifStatement.getElseStatement.asInstanceOf[CtBlock[Any]]
+        val thenBlock = ifStatement.getThenStatement.asInstanceOf[CtBlock[T]]
+        val elseBlock = ifStatement.getElseStatement.asInstanceOf[CtBlock[T]]
         List(thenBlock, elseBlock).filter(_ != null)
       }
       else if (Recognizer.recognize[CtLoop](x)) {
         val loopStatement = x.asInstanceOf[CtLoop]
-        List(loopStatement.getBody.asInstanceOf[CtBlock[Any]])
+        List(loopStatement.getBody.asInstanceOf[CtBlock[T]])
       }
-      else if (Recognizer.recognize[CtBlock[Any]](x)) List(x.asInstanceOf[CtBlock[Any]])
-      else List.empty[CtBlock[Any]]
+      else if (Recognizer.recognize[CtBlock[T]](x)) List(x.asInstanceOf[CtBlock[T]])
+      else List.empty[CtBlock[T]]
     }
   }
 }
