@@ -9,10 +9,9 @@ public class TestClass2 {
         }
     }
 
-    private Object[] fooHelper0(int i, int j) {
+    private void fooHelper0(int i, int j) {
         i += 1;
         j += 1;
         System.out.println(i);
-        return new Object[]{ i, j };
     }
 }
