@@ -1,7 +1,8 @@
 package com.amp.examples;
 
+
 /**
- * test comment
+ * test code 1
  */
 public class TestClass {
     public double testMethod() throws InterruptedException {

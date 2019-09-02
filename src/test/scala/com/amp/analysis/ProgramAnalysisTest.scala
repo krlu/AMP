@@ -1,8 +1,8 @@
 package com.amp.analysis
 
-import java.io.{File, FileWriter}
+import java.io.File
 
-import com.amp.analysis.ProgramTransformer._
+import com.amp.analysis.StaticAnalysisUtil._
 import com.amp.examples.TestClass
 import org.scalatest.{FlatSpec, Matchers}
 import spoon.reflect.declaration.CtMethod
@@ -10,10 +10,12 @@ import spoon.reflect.declaration.CtMethod
 import scala.io.Source._
 import scala.jdk.CollectionConverters._
 
-class ProgramAnalysisTest extends FlatSpec with Matchers{
+class ProgramAnalysisTest extends FlatSpec with Matchers {
+
   "Program output Analyzer" should "output correct analysis in near constant time" in {
+    import com.amp.analysis.MethodIOAnalyzer._
     val filePath = "src/main/java/com/amp/examples/TestClass.java"
-    val (_, ctModel) = getAST(filePath)
+    val ctModel = getAST(filePath)
     val elements = ctModel.getElements[CtMethod[Any]](methodFilter).asScala.toList
     val x = elements.head.asInstanceOf[CtMethod[Double]]
 
@@ -32,13 +34,12 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
   }
 
   "Program output Analyzer" should "support refactoring method" in {
+    import com.amp.analysis.MethodRefactorer._
     for(testNum <- 2 to 3) {
       val filePath = s"src/main/java/com/amp/examples/TestClass$testNum.java"
       val refactoredClass = refactorMethodsForClass(filePath)
       val tempFilePath = "temp.txt"
-      val fw = new FileWriter(tempFilePath)
-      fw.write(refactoredClass.toString)
-      fw.close()
+      printFullClass(refactoredClass, tempFilePath)
       val testFilePath = s"test$testNum.txt"
       val savedLines = fromResource(testFilePath).getLines.toList
       val buffer = fromFile(tempFilePath)
@@ -50,4 +51,5 @@ class ProgramAnalysisTest extends FlatSpec with Matchers{
       file.delete()
     }
   }
+
 }

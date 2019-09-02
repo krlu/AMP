@@ -1,5 +1,9 @@
 package com.amp.examples;
 
+
+/**
+ * Test code 2
+ */
 public class TestClass2 {
     public void foo(int i, int j){
         int k = 0;
