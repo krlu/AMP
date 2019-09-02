@@ -1,12 +1,13 @@
 package com.amp.analysis
 
 import com.amp.analysis.StaticAnalysisUtil._
-import spoon.reflect.code.{CtBlock, CtExpression, CtFieldRead, CtIf, CtLoop, CtVariableAccess}
-import spoon.reflect.declaration.{CtExecutable, CtMethod, CtParameter, CtType, ModifierKind}
+import spoon.reflect.code.{CtBlock, CtExpression, CtFieldRead, CtIf, CtLocalVariable, CtLoop, CtVariableAccess}
+import spoon.reflect.declaration.{CtExecutable, CtMethod, CtNamedElement, CtParameter, CtType, ModifierKind}
 import spoon.reflect.factory.Factory
 import spoon.reflect.reference.{CtTypeReference, CtVariableReference}
 import spoon.support.reflect.code.CtVariableWriteImpl
 import spoon.support.reflect.reference.CtLocalVariableReferenceImpl
+
 import scala.jdk.CollectionConverters._
 
 /**
@@ -128,20 +129,56 @@ object MethodRefactorer {
     * @param codeBlock - input source code
     * @return list of CtBlock
     */
-  private def getBLocks[T](codeBlock: CtBlock[T]): List[CtBlock[T]] = {
-    codeBlock.getDirectChildren.asScala.toList.flatMap { x =>
+  def getBLocks[T](codeBlock: CtBlock[T]): List[CtBlock[T]] = {
+    val blocks: List[CtBlock[T]] = codeBlock.getDirectChildren.asScala.toList.flatMap { x =>
       if (Recognizer.recognize[CtIf](x)) {
         val ifStatement = x.asInstanceOf[CtIf]
         val thenBlock = ifStatement.getThenStatement.asInstanceOf[CtBlock[T]]
         val elseBlock = ifStatement.getElseStatement.asInstanceOf[CtBlock[T]]
-        List(thenBlock, elseBlock).filter(_ != null)
+        val blocks = List(thenBlock, elseBlock).filter(_ != null).flatMap{ b =>
+          if(isChildBlock(b)) List(b) else getBLocks[T](b)
+        }
+        blocks
       }
       else if (Recognizer.recognize[CtLoop](x)) {
         val loopStatement = x.asInstanceOf[CtLoop]
-        List(loopStatement.getBody.asInstanceOf[CtBlock[T]])
+        val loopBlock = loopStatement.getBody.asInstanceOf[CtBlock[T]]
+        if(isChildBlock(loopBlock)) List(loopBlock) else getBLocks(loopBlock)
       }
-      else if (Recognizer.recognize[CtBlock[T]](x)) List(x.asInstanceOf[CtBlock[T]])
-      else List.empty[CtBlock[T]]
+      else if (Recognizer.recognize[CtBlock[T]](x)) {
+        val block = x.asInstanceOf[CtBlock[T]]
+        if(isChildBlock(block)) List(block) else getBLocks(block)
+      } else List.empty[CtBlock[T]]
+    }
+    reNameLocalVars(blocks)
+    blocks
+  }
+
+  /**
+    * For changing variables to be the same name across all blocks
+    * This way, we can find blocks that are logically identical despite being syntactically different
+    * @param blocks - input code blocks
+    */
+  private def reNameLocalVars[T](blocks: Seq[CtBlock[T]]): Unit = {
+    val localVarNames = blocks.flatMap{ b => b.getElements(localVarFilter).asScala.toList.map(_.getSimpleName)}
+    blocks.foreach{ b: CtBlock[T] =>
+      val localVars = b.getElements(filter(classOf[CtLocalVariable[T]])).asScala.toList
+      localVars.indices.foreach{ i =>
+        val localVar: CtLocalVariable[T] = localVars(i)
+        val oldName = localVar.getSimpleName
+        val newName = localVarNames(i)
+        localVar.setSimpleName[CtNamedElement](newName)
+        b.getElements(variableReferenceFilter).asScala.toList.foreach{ varRef =>
+          if(varRef.getSimpleName == oldName) varRef.setSimpleName(newName)
+        }
+      }
     }
   }
+
+  /**
+    * @param codeBlock - input code block
+    * @return - true if and only none of the children in this block is of type CtBlock
+    */
+  private def isChildBlock[T](codeBlock: CtBlock[T]): Boolean =
+    codeBlock.getDirectChildren.asScala.toList.forall(!Recognizer.recognize[CtBlock[T]](_))
 }

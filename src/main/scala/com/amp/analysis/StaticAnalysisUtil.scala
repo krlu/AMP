@@ -24,7 +24,7 @@ object StaticAnalysisUtil {
   val variableReadFilter = filter(classOf[CtVariableRead[Any]])
   val variableReferenceFilter = filter(classOf[CtLocalVariableReference[Any]])
 
-  private def filter[T <: CtElement](c: Class[T]): TypeFilter[T] = new TypeFilter[T](c)
+  def filter[T <: CtElement](c: Class[T]): TypeFilter[T] = new TypeFilter[T](c)
 
   /** Creates a temporary file with the exact same AST as the original source code
     * Reads the AST from that file then deletes that file
