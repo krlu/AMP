@@ -37,11 +37,11 @@ object MethodRefactorer {
     * @return - refactored helper functions
     */
   def refactorMethod[T](method: CtMethod[T], methodClone: CtMethod[T]): List[CtMethod[T]] = {
-    val blocks = getBLocks[T](method.getBody)
-    val clonedBlocks = getBLocks[T](methodClone.getBody)
+    val blocks = getBLocks[T](method.getBody).filter{ block => block.getDirectChildren.size() > 1}
+    val clonedBlocks = getBLocks[T](methodClone.getBody).filter{ block => block.getDirectChildren.size() > 1}
     val uniqueBlocks = blocks.distinct
-    val uniqueMultiBlocks = uniqueBlocks.filter { block => blocks.count(_ == block) > 1 }
     val uniqueClonedBlocks = clonedBlocks.distinct
+    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 }
     val blockToMethod: Map[String, CtMethod[T]] = uniqueMultiBlocks.indices.map{ i =>
       val block = uniqueClonedBlocks(i)
       // get all variables defined in block
@@ -135,10 +135,9 @@ object MethodRefactorer {
         val ifStatement = x.asInstanceOf[CtIf]
         val thenBlock = ifStatement.getThenStatement.asInstanceOf[CtBlock[T]]
         val elseBlock = ifStatement.getElseStatement.asInstanceOf[CtBlock[T]]
-        val blocks = List(thenBlock, elseBlock).filter(_ != null).flatMap{ b =>
+        List(thenBlock, elseBlock).filter(_ != null).flatMap{ b =>
           if(isChildBlock(b)) List(b) else getBLocks[T](b)
         }
-        blocks
       }
       else if (Recognizer.recognize[CtLoop](x)) {
         val loopStatement = x.asInstanceOf[CtLoop]
@@ -176,9 +175,11 @@ object MethodRefactorer {
   }
 
   /**
+    * Checks if input block has any child elements (excluding itself) that are of type CtBlock
+    * Thus if the set of children is 1 or 0, return true otherwise return false
     * @param codeBlock - input code block
-    * @return - true if and only none of the children in this block is of type CtBlock
+    * @return - true if and only if input block is child block
     */
   private def isChildBlock[T](codeBlock: CtBlock[T]): Boolean =
-    codeBlock.getDirectChildren.asScala.toList.forall(!Recognizer.recognize[CtBlock[T]](_))
+    codeBlock.getElements(blockFilter).asScala.toList.size <= 1
 }

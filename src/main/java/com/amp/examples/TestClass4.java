@@ -15,11 +15,16 @@ public class TestClass4 {
             System.out.println(k);
         }
         else{
-            int n = 1;
-            i += 1;
-            j += 1;
-            System.out.println(n);
-            System.out.println(k);
+            if(i == 0){
+                System.out.println("hi");
+            }
+            else {
+                int n = 1;
+                i += 1;
+                j += 1;
+                System.out.println(n);
+                System.out.println(k);
+            }
         }
     }
 }

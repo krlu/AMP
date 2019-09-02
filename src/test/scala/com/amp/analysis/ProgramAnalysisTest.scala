@@ -2,6 +2,7 @@ package com.amp.analysis
 
 import java.io.File
 
+import com.amp.analysis.MethodRefactorer.refactorMethodsForClass
 import com.amp.analysis.StaticAnalysisUtil._
 import com.amp.examples.TestClass
 import org.scalatest.{FlatSpec, Matchers}

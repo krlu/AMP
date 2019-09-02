@@ -14,6 +14,7 @@ import scala.jdk.CollectionConverters._
 object StaticAnalysisUtil {
 
   val anyFilter = filter(classOf[CtElement])
+  val blockFilter = filter(classOf[CtBlock[Any]])
   val methodFilter = filter(classOf[CtMethod[Any]])
   val returnFilter = filter(classOf[CtReturn[Any]])
   val assignmentFilter = filter(classOf[CtAssignment[Any, Any]])
