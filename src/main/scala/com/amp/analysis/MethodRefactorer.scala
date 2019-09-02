@@ -21,7 +21,7 @@ object MethodRefactorer {
     */
   def refactorMethodsForClass(filePath: String): CtType[_] = {
     val ctModelOriginal = getAST(filePath)
-    val ctModelCloned = cloneAST(filePath)
+    val ctModelCloned = getAST(filePath)
     val methods = ctModelOriginal.getElements(methodFilter).asScala.toList
     val clonedMethods = ctModelCloned.getElements(methodFilter).asScala.toList
     val helperMethods = (methods zip clonedMethods).flatMap { case (a, b) => refactorMethod[Any](a, b) }

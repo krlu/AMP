@@ -1,10 +1,9 @@
 package com.amp.analysis
-import java.io.{File, FileWriter}
+import java.io.FileWriter
 
 import spoon.Launcher
 import spoon.reflect.CtModel
 import spoon.reflect.code._
-import spoon.reflect.cu.CompilationUnit
 import spoon.reflect.declaration._
 import spoon.reflect.reference.CtLocalVariableReference
 import spoon.reflect.visitor.filter.TypeFilter
@@ -26,26 +25,8 @@ object StaticAnalysisUtil {
 
   def filter[T <: CtElement](c: Class[T]): TypeFilter[T] = new TypeFilter[T](c)
 
-  /** Creates a temporary file with the exact same AST as the original source code
-    * Reads the AST from that file then deletes that file
-    * This roundabout way of deep copying was due to inability to clone CtElements directly
-    * @param inputPath - input file
-    * @return pair consisting of
-    *         cu - compilation unit, contains package info and list of imported libraries
-    *         model - the AST of the input program
-    */
-  def cloneAST(inputPath: String): CtModel = {
-    val model = getAST(inputPath)
-    val pathToCopy = s"${inputPath.split("/").last.replace(".java", "_copy.java")}"
-    printFullClass(model.getAllTypes.asScala.head, pathToCopy)
-    val ast = getAST(pathToCopy)
-    val file = new File(pathToCopy)
-    file.delete()
-    ast
-  }
-
   /**
-    * Obtains the Abstract Syntax Tree and Compilation Unit of the input java program
+    * Obtains the Abstract Syntax Tree of the input java program
     * Both can be modified with source code transformation techniques
     * @param inputPath - input file
     * @return pair consisting of
@@ -60,6 +41,11 @@ object StaticAnalysisUtil {
     launcher.buildModel
     val model: CtModel = launcher.getModel
     model
+  }
+
+  def getRawAST[T](inputPath: String): CtType[T] = {
+    val model = getAST(inputPath)
+    model.getAllTypes.asScala.toList.head.asInstanceOf[CtType[T]]
   }
 
   /**
