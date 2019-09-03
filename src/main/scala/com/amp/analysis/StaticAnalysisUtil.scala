@@ -16,6 +16,7 @@ object StaticAnalysisUtil {
   val anyFilter = filter(classOf[CtElement])
   val blockFilter = filter(classOf[CtBlock[Any]])
   val methodFilter = filter(classOf[CtMethod[Any]])
+  val methodCallFilter = filter(classOf[CtInvocation[Any]])
   val returnFilter = filter(classOf[CtReturn[Any]])
   val assignmentFilter = filter(classOf[CtAssignment[Any, Any]])
   val localVarFilter = filter(classOf[CtLocalVariable[Any]])

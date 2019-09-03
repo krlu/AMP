@@ -2,7 +2,6 @@ package com.amp.analysis
 
 import java.io.File
 
-import com.amp.analysis.MethodRefactorer.refactorMethodsForClass
 import com.amp.analysis.StaticAnalysisUtil._
 import com.amp.examples.TestClass
 import org.scalatest.{FlatSpec, Matchers}
@@ -36,18 +35,24 @@ class ProgramAnalysisTest extends FlatSpec with Matchers {
 
   "Program output Analyzer" should "support refactoring method" in {
     import com.amp.analysis.MethodRefactorer._
-    for(testNum <- 2 to 4) {
+    for(testNum <- 2 to 5) {
       val filePath = s"src/main/java/com/amp/examples/TestClass$testNum.java"
       val refactoredClass = refactorMethodsForClass(filePath)
-      val tempFilePath = "temp.txt"
+      val tempFilePath = "temp.java"
       printFullClass(refactoredClass, tempFilePath)
-      val testFilePath = s"test$testNum.txt"
+      val testFilePath = s"test$testNum.java"
       val savedLines = fromResource(testFilePath).getLines.toList
       val buffer = fromFile(tempFilePath)
       val lines = buffer.getLines.toList
       buffer.close()
+      val m1 = getAST(s"src/test/resources/$testFilePath").getAllTypes.asScala.toList.head
+      val m2 = getAST(tempFilePath).getAllTypes.asScala.toList.head
+      assert(m1 == m2)
+      assert(m1.toStringWithImports == m2.toStringWithImports)
       assert(lines.size == savedLines.size)
-      (lines zip savedLines).foreach {case (l1, l2) => assert(l1 == l2)}
+      (lines zip savedLines).foreach {case (l1, l2) =>
+        assert(l1.trim == l2.trim)
+      }
       val file = new File(tempFilePath)
       file.delete()
     }

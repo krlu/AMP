@@ -26,7 +26,12 @@ object MethodRefactorer {
     val clonedMethods = ctModelCloned.getElements(methodFilter).asScala.toList
     val helperMethods = (methods zip clonedMethods).flatMap { case (a, b) => refactorMethod[Any](a, b) }
     val clonedCode = ctModelCloned.getAllTypes.asScala.head
+    val methodCalls = clonedCode.getElements(methodCallFilter).asScala.toList.map(_.getExecutable.getSimpleName)
     helperMethods.foreach(clonedCode.addMethod)
+    helperMethods.filterNot{ method =>
+      val name = method.getSimpleName
+      methodCalls.contains(name)
+    }.foreach(clonedCode.removeMethod)
     clonedCode
   }
 
@@ -37,8 +42,8 @@ object MethodRefactorer {
     * @return - refactored helper functions
     */
   def refactorMethod[T](method: CtMethod[T], methodClone: CtMethod[T]): List[CtMethod[T]] = {
-    val blocks = getBLocks[T](method.getBody).filter{ block => block.getDirectChildren.size() > 1}
-    val clonedBlocks = getBLocks[T](methodClone.getBody).filter{ block => block.getDirectChildren.size() > 1}
+    val blocks = getBlocks[T](method.getBody)
+    val clonedBlocks = getBlocks[T](methodClone.getBody)
     val uniqueBlocks = blocks.distinct
     val uniqueClonedBlocks = clonedBlocks.distinct
     val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 }
@@ -61,6 +66,7 @@ object MethodRefactorer {
     clonedBlocks.indices.foreach{ i =>
       val clonedBlock = clonedBlocks(i)
       val originalBlock = blocks(i)
+      if(blockToMethod.contains(clonedBlock.toString))
       updateBlocks(clonedBlock, originalBlock, blockToMethod(clonedBlock.toString))
     }
     blockToMethod.values.toList
@@ -129,26 +135,28 @@ object MethodRefactorer {
     * @param codeBlock - input source code
     * @return list of CtBlock
     */
-  def getBLocks[T](codeBlock: CtBlock[T]): List[CtBlock[T]] = {
-    val blocks: List[CtBlock[T]] = codeBlock.getDirectChildren.asScala.toList.flatMap { x =>
+  def getBlocks[T](codeBlock: CtBlock[T], isRoot: Boolean = true): List[CtBlock[T]] = {
+    var blocks: List[CtBlock[T]] = codeBlock.getDirectChildren.asScala.toList.flatMap { x =>
       if (Recognizer.recognize[CtIf](x)) {
         val ifStatement = x.asInstanceOf[CtIf]
         val thenBlock = ifStatement.getThenStatement.asInstanceOf[CtBlock[T]]
         val elseBlock = ifStatement.getElseStatement.asInstanceOf[CtBlock[T]]
-        List(thenBlock, elseBlock).filter(_ != null).flatMap{ b =>
-          if(isChildBlock(b)) List(b) else getBLocks[T](b)
+        List(thenBlock, elseBlock).filter(_ != null).flatMap { b =>
+          if (isChildBlock(b)) List(b) else getBlocks[T](b, isRoot = false)
         }
       }
       else if (Recognizer.recognize[CtLoop](x)) {
         val loopStatement = x.asInstanceOf[CtLoop]
         val loopBlock = loopStatement.getBody.asInstanceOf[CtBlock[T]]
-        if(isChildBlock(loopBlock)) List(loopBlock) else getBLocks(loopBlock)
+        if (isChildBlock(loopBlock)) List(loopBlock) else getBlocks(loopBlock, isRoot = false)
       }
       else if (Recognizer.recognize[CtBlock[T]](x)) {
         val block = x.asInstanceOf[CtBlock[T]]
-        if(isChildBlock(block)) List(block) else getBLocks(block)
+        if (isChildBlock(block)) List(block) else getBlocks(block, isRoot = false)
       } else List.empty[CtBlock[T]]
     }
+    if(!isRoot)
+      blocks = List(codeBlock) ++ blocks
     reNameLocalVars(blocks)
     blocks
   }
