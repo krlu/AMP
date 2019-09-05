@@ -1,10 +1,10 @@
-package com.amp.examples;
+package com.amp.examples.refactor;
 
 
 /**
- * Test code 2
+ * Test code 1
  */
-public class TestClass2 {
+public class TestClass1 {
     public void foo(int i, int j) {
         int k = 0;
         if (j > 0) {

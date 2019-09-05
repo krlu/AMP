@@ -1,10 +1,10 @@
-package com.amp.examples;
+package com.amp.examples.refactor;
 
 
 /**
- * Test code 5
+ * Test code 4
  */
-public class TestClass5 {
+public class TestClass4 {
     public void foo(int i, int j) {
         int k = 0;
         if (j > 0) {
@@ -22,10 +22,10 @@ public class TestClass5 {
         if (i == 0) {
             System.out.println("hi");
         }  else {
-            int mhskjdhfkjs = 1;
+            int m = 1;
             i += 1;
             j += 1;
-            System.out.println(mhskjdhfkjs);
+            System.out.println(m);
             System.out.println(k);
         }
     }

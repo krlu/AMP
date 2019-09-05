@@ -1,20 +1,16 @@
-package com.amp.examples;
+package com.amp.examples.refactor;
 
 
 /**
- * Test code 4
+ * Test code 2
  */
-public class TestClass4 {
+public class TestClass2 {
     public void foo(int i, int j) {
         int k = 0;
         if (j > 0) {
             fooHelper0(i, j, k);
         } else {
-            if (i == 0) {
-                System.out.println("hi");
-            } else {
-                fooHelper0(i, j, k);
-            }
+            fooHelper0(i, j, k);
         }
     }
 

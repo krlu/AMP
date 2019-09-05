@@ -1,4 +1,4 @@
-package com.amp.examples;
+package com.amp.examples.refactor;
 
 
 /**
@@ -10,7 +10,11 @@ public class TestClass3 {
         if (j > 0) {
             fooHelper0(i, j, k);
         } else {
-            fooHelper0(i, j, k);
+            if (i == 0) {
+                System.out.println("hi");
+            } else {
+                fooHelper0(i, j, k);
+            }
         }
     }
 

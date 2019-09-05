@@ -3,7 +3,7 @@ package com.amp.analysis
 import java.io.File
 
 import com.amp.analysis.StaticAnalysisUtil._
-import com.amp.examples.TestClass
+import com.amp.examples.ioestimation.TestClass
 import org.scalatest.{FlatSpec, Matchers}
 import spoon.reflect.declaration.CtMethod
 
@@ -12,9 +12,11 @@ import scala.jdk.CollectionConverters._
 
 class ProgramAnalysisTest extends FlatSpec with Matchers {
 
+  private val inputTestPath = "src/test/java/com/amp/examples"
+
   "Program output Analyzer" should "output correct analysis in near constant time" in {
     import com.amp.analysis.MethodIOAnalyzer._
-    val filePath = "src/main/java/com/amp/examples/TestClass.java"
+    val filePath = s"$inputTestPath/ioestimation/TestClass.java"
     val ctModel = getAST(filePath)
     val elements = ctModel.getElements[CtMethod[Any]](methodFilter).asScala.toList
     val x = elements.head.asInstanceOf[CtMethod[Double]]
@@ -35,17 +37,18 @@ class ProgramAnalysisTest extends FlatSpec with Matchers {
 
   "Program output Analyzer" should "support refactoring method" in {
     import com.amp.analysis.MethodRefactorer._
-    for(testNum <- 2 to 5) {
-      val filePath = s"src/main/java/com/amp/examples/TestClass$testNum.java"
+    for(testNum <- 1 to 4) {
+      val filePath = s"$inputTestPath/refactor/TestClass$testNum.java"
       val refactoredClass = refactorMethodsForClass(filePath)
       val tempFilePath = "temp.java"
       printFullClass(refactoredClass, tempFilePath)
-      val testFilePath = s"test$testNum.java"
-      val savedLines = fromResource(testFilePath).getLines.toList
+      val testFileName = s"refactor/test$testNum.java"
+      val testFilePath = s"src/test/resources/$testFileName"
+      val savedLines = fromResource(testFileName).getLines.toList
       val buffer = fromFile(tempFilePath)
       val lines = buffer.getLines.toList
       buffer.close()
-      val m1 = getAST(s"src/test/resources/$testFilePath").getAllTypes.asScala.toList.head
+      val m1 = getAST(testFilePath).getAllTypes.asScala.toList.head
       val m2 = getAST(tempFilePath).getAllTypes.asScala.toList.head
       assert(m1 == m2)
       assert(m1.toStringWithImports == m2.toStringWithImports)
