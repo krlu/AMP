@@ -47,8 +47,9 @@ object MethodRefactorer {
     val uniqueBlocks = blocks.distinct
     val uniqueClonedBlocks = clonedBlocks.distinct
     val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 }
+    val uniqueClonedMultiBlocks = uniqueClonedBlocks.filter{ block => blocks.count(_ == block) > 1 }
     val blockToMethod: Map[String, CtMethod[T]] = uniqueMultiBlocks.indices.map{ i =>
-      val block = uniqueClonedBlocks(i)
+      val block = uniqueClonedMultiBlocks(i)
       // get all variables defined in block
       val innerScopeVars = block.getElements(localVarFilter).asScala.toList.map(_.getReference.getSimpleName)
       // get all variables defined or used in block and outside block
@@ -66,8 +67,9 @@ object MethodRefactorer {
     clonedBlocks.indices.foreach{ i =>
       val clonedBlock = clonedBlocks(i)
       val originalBlock = blocks(i)
-      if(blockToMethod.contains(clonedBlock.toString))
-      updateBlocks(clonedBlock, originalBlock, blockToMethod(clonedBlock.toString))
+      if(blockToMethod.contains(clonedBlock.toString)) {
+        updateBlocks(clonedBlock, originalBlock, blockToMethod(clonedBlock.toString))
+      }
     }
     blockToMethod.values.toList
   }

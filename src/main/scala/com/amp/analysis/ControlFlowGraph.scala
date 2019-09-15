@@ -1,11 +1,10 @@
 package com.amp.analysis
 
-import spoon.reflect.code.CtBlock
-import spoon.reflect.declaration.CtElement
+import spoon.reflect.code.CtLiteral
 
-class ControlFlowGraph(nodes: Map[CtElement, Set[CtElement]])
+class ControlFlowGraph(nodes: Map[State, Set[State]])
 
-object ControlFlowGraph{
-  def apply(nodes: Map[CtElement, Set[CtElement]]): ControlFlowGraph = new ControlFlowGraph(nodes)
-  def apply[T](block: CtBlock[T]): ControlFlowGraph = ???
-}
+/**
+  * Represents the state of the program
+  */
+case class State(variablesInScope: Map[String, CtLiteral[Any]])
