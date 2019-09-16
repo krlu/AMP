@@ -8,11 +8,6 @@ import scala.jdk.CollectionConverters._
 
 object CFGAnalyzer {
 
-  def main(args: Array[String]): Unit = {
-    val path = "src/test/java/com/amp/examples/refactor/TestClass6.java"
-    val x = MethodRefactorer.oneIterationRefactor(path)
-    println(x.toStringWithImports)
-  }
   /**
     * Analyze the state of the program before and after applying a block
     * @param cfg - state pre block application

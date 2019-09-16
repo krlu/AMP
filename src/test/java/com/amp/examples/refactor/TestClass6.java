@@ -13,7 +13,8 @@ public class TestClass6 {
                 i += 1;
                 j += 1;
                 System.out.println(p);
-                System.out.println(k);            }
+                System.out.println(k);
+            }
             else {
                 int m = 1;
                 i += 1;

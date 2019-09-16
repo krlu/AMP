@@ -43,7 +43,7 @@ object MethodRefactorer {
     val ctModelCloned = getAST(filePath)
     val methods = ctModelOriginal.getElements(methodFilter).asScala.toList
     val clonedMethods = ctModelCloned.getElements(methodFilter).asScala.toList
-    val helperMethods = (methods zip clonedMethods).flatMap { case (a, b) => refactorMethod[Any](a, b) }
+    val helperMethods = (methods zip clonedMethods).flatMap { case (a, b) => refactorMethod[Any](a, b, methods) }
     val clonedCode = ctModelCloned.getAllTypes.asScala.head
     val methodCalls = clonedCode.getElements(methodCallFilter).asScala.toList.map(_.getExecutable.getSimpleName)
     helperMethods.foreach(clonedCode.addMethod)
@@ -60,7 +60,7 @@ object MethodRefactorer {
     * @param methodClone - method clone (this is the method we will refactor)
     * @return - refactored helper functions
     */
-  def refactorMethod[T](method: CtMethod[T], methodClone: CtMethod[T]): List[CtMethod[T]] = {
+  private def refactorMethod[T](method: CtMethod[T], methodClone: CtMethod[T], allMethods: List[CtMethod[T]]): List[CtMethod[T]] = {
     val blocks = getBlocks[T](method.getBody)
     val clonedBlocks = getBlocks[T](methodClone.getBody)
     val uniqueBlocks = blocks.distinct
@@ -80,8 +80,15 @@ object MethodRefactorer {
         .filterNot(e => innerScopeVars.contains(e.toString))
         .map(e => (e.getReferencedTypes.asScala.toList.head.asInstanceOf[CtTypeReference[T]], e.toString))
         .distinct.sortBy(_._2)
-      block.toString -> createHelperMethod[T](uniqueMultiBlocks(i), relevantVarNames,
-        method.getType, s"${method.getSimpleName}Helper$i")
+      block.toString -> {
+        // check if desired helper method already exists, if so use that, otherwise create brand new one
+        val existingMethodOpt = allMethods.find(_.getBody == uniqueMultiBlocks(i))
+        existingMethodOpt match {
+          case Some(m) => m
+          case None =>  createHelperMethod[T](uniqueMultiBlocks(i), relevantVarNames,
+            method.getType, s"${method.getSimpleName}Helper$i")
+        }
+      }
     }.toMap
     clonedBlocks.indices.foreach{ i =>
       val clonedBlock = clonedBlocks(i)
