@@ -22,6 +22,9 @@ public class TestClass5 {
 
     }
 
+    private void bar() {
+    }
+
     private void fooHelper0(int i, int j, int k) {
         int m = 1;
         i += 1;
@@ -33,6 +36,6 @@ public class TestClass5 {
     private void fooHelper1(int i, int k) {
         k += 1;
         i += 2;
-        System.out.println("hi");
+        bar();
     }
 }

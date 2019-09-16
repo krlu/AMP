@@ -2,15 +2,18 @@ package com.amp.examples.refactor;
 
 
 /**
- * Test code 4
+ * Test code 6
  */
-public class TestClass4 {
+public class TestClass6 {
     public void foo(int i, int j){
         int k = 0;
         if(j > 0){
             if(i == 0){
-                System.out.println("hi");
-            }
+                int p = 1;
+                i += 1;
+                j += 1;
+                System.out.println(p);
+                System.out.println(k);            }
             else {
                 int m = 1;
                 i += 1;
@@ -19,9 +22,13 @@ public class TestClass4 {
                 System.out.println(k);
             }
         }
-        else{
+        else if( j == 0){
             if(i == 0){
-                System.out.println("hi");
+                int q = 1;
+                i += 1;
+                j += 1;
+                System.out.println(q);
+                System.out.println(k);
             }
             else {
                 int n = 1;
@@ -31,22 +38,8 @@ public class TestClass4 {
                 System.out.println(k);
             }
         }
-        while(i <= 0){
+        else{
             System.out.println("bye");
-            if(j < 1){
-                System.out.println("ok");
-            }
-            while(j <= 0) {
-                if (i == 0) {
-                    System.out.println("hi");
-                } else {
-                    int n = 1;
-                    i += 1;
-                    j += 1;
-                    System.out.println(n);
-                    System.out.println(k);
-                }
-            }
         }
     }
 }

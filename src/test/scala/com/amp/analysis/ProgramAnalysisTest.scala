@@ -37,11 +37,12 @@ class ProgramAnalysisTest extends FlatSpec with Matchers {
 
   "Program output Analyzer" should "support refactoring method" in {
     import com.amp.analysis.MethodRefactorer._
-    for(testNum <- 1 to 5) {
+    for(testNum <- 1 to 6) {
       val filePath = s"$inputTestPath/refactor/TestClass$testNum.java"
       val refactoredClass = refactorMethodsForClass(filePath)
       val tempFilePath = "temp.java"
-      printFullClass(refactoredClass, tempFilePath)
+      if(refactoredClass.nonEmpty)
+        printFullClass(refactoredClass.get, tempFilePath)
       val testFileName = s"refactor/test$testNum.java"
       val testFilePath = s"src/test/resources/$testFileName"
       val savedLines = fromResource(testFileName).getLines.toList

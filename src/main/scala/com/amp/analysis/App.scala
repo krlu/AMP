@@ -27,7 +27,11 @@ object App {
         case "--refactor" =>
           val outputFilePath = args(2)
           val refactoredClass = refactorMethodsForClass(filePath)
-          printFullClass(refactoredClass, outputFilePath)
+          refactoredClass match {
+            case Some(rfc) => printFullClass(rfc, outputFilePath)
+            case None =>
+              System.out.println("Class was not refactorable!")
+          }
         case "--print" =>
           val outputFilePath = args(2)
           printFullClass(ctModel.getAllTypes.asScala.head, outputFilePath)

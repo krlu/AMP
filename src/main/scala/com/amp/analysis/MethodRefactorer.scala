@@ -1,7 +1,9 @@
 package com.amp.analysis
 
+import java.io.{File, FileWriter}
+
 import com.amp.analysis.StaticAnalysisUtil._
-import spoon.reflect.code.{CtBlock, CtExpression, CtFieldRead, CtIf, CtLocalVariable, CtLoop, CtVariableAccess}
+import spoon.reflect.code.{CtBlock, CtExpression, CtFieldRead, CtIf, CtInvocation, CtLocalVariable, CtLoop, CtVariableAccess}
 import spoon.reflect.declaration.{CtExecutable, CtMethod, CtNamedElement, CtParameter, CtType, ModifierKind}
 import spoon.reflect.factory.Factory
 import spoon.reflect.reference.{CtTypeReference, CtVariableReference}
@@ -19,7 +21,24 @@ object MethodRefactorer {
     * @param filePath - path to input source code file
     * @return - refactored source code
     */
-  def refactorMethodsForClass(filePath: String): CtType[_] = {
+  def refactorMethodsForClass(filePath: String): Option[CtType[_]] = {
+    var fileNum = 0
+    var outPath = filePath
+    var x: Option[CtType[_]]= None
+    while(MethodRefactorer.isRefactorable(outPath)){
+      x = Some(oneIterationRefactor(outPath))
+      outPath = s"temp${fileNum}.java"
+      StaticAnalysisUtil.printFullClass(x.get, outPath)
+      fileNum += 1
+    }
+    for(i <- 0 to fileNum){
+      val fw = new File(s"temp${i}.java")
+      fw.delete()
+    }
+    x
+  }
+
+  def oneIterationRefactor(filePath: String): CtType[_] = {
     val ctModelOriginal = getAST(filePath)
     val ctModelCloned = getAST(filePath)
     val methods = ctModelOriginal.getElements(methodFilter).asScala.toList
@@ -46,8 +65,8 @@ object MethodRefactorer {
     val clonedBlocks = getBlocks[T](methodClone.getBody)
     val uniqueBlocks = blocks.distinct
     val uniqueClonedBlocks = clonedBlocks.distinct
-    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 }
-    val uniqueClonedMultiBlocks = uniqueClonedBlocks.filter{ block => blocks.count(_ == block) > 1 }
+    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 && !isSingleMethod(block)}
+    val uniqueClonedMultiBlocks = uniqueClonedBlocks.filter{ block => blocks.count(_ == block) > 1 && !isSingleMethod(block)}
     val blockToMethod: Map[String, CtMethod[T]] = uniqueMultiBlocks.indices.map{ i =>
       val block = uniqueClonedMultiBlocks(i)
       // get all variables defined in block
@@ -133,11 +152,11 @@ object MethodRefactorer {
   }
 
   /**
-    * Finds all code blocks in a give method, used to support refactoring
+    * Finds all code blocks in a given method, used to support refactoring
     * @param codeBlock - input source code
     * @return list of CtBlock
     */
-  def getBlocks[T](codeBlock: CtBlock[T], isRoot: Boolean = true): List[CtBlock[T]] = {
+  private def getBlocks[T](codeBlock: CtBlock[T], isRoot: Boolean = true): List[CtBlock[T]] = {
     var blocks: List[CtBlock[T]] = codeBlock.getDirectChildren.asScala.toList.flatMap { x =>
       if (Recognizer.recognize[CtIf](x)) {
         val ifStatement = x.asInstanceOf[CtIf]
@@ -192,4 +211,26 @@ object MethodRefactorer {
     */
   private def isChildBlock[T](codeBlock: CtBlock[T]): Boolean =
     codeBlock.getElements(blockFilter).asScala.toList.size <= 1
+
+  /**
+    * Checks if block only has one direct child and checks if that child is of type CtMethod
+    * @param codeBlock - input code block
+    * @return true if has no children or a single method call
+    */
+  private def isSingleMethod[T](codeBlock: CtBlock[T]): Boolean = {
+    val children = codeBlock.getDirectChildren
+    children.isEmpty || children.size() == 1 && Recognizer.recognize[CtInvocation[T]](children.get(0))
+  }
+
+  def isRefactorable(filePath: String): Boolean = {
+    val ctModelOriginal = getAST(filePath)
+    ctModelOriginal.getElements(methodFilter).asScala.toList.exists(isRefactorableMethod)
+  }
+
+  private def isRefactorableMethod[T](method: CtMethod[T]): Boolean = {
+    val blocks = getBlocks[T](method.getBody)
+    val uniqueBlocks = blocks.distinct
+    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 && !isSingleMethod(block)}
+    uniqueMultiBlocks.nonEmpty
+  }
 }

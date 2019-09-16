@@ -17,7 +17,7 @@ public class TestClass5 {
             if(i == 0){
                 k += 1;
                 i += 2;
-                System.out.println("hi");
+                bar();
             }
             else {
                 int n = 1;
@@ -30,7 +30,11 @@ public class TestClass5 {
         else{
             k += 1;
             i += 2;
-            System.out.println("hi");
+            bar();
         }
+    }
+
+    private void bar(){
+
     }
 }
