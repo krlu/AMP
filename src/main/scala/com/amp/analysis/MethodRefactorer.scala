@@ -1,10 +1,9 @@
 package com.amp.analysis
 
-import java.io.{File, FileWriter}
-
 import com.amp.analysis.StaticAnalysisUtil._
-import spoon.reflect.code.{CtBlock, CtExpression, CtFieldRead, CtIf, CtInvocation, CtLocalVariable, CtLoop, CtVariableAccess}
-import spoon.reflect.declaration.{CtExecutable, CtMethod, CtNamedElement, CtParameter, CtType, ModifierKind}
+import com.amp.util.Cloner
+import spoon.reflect.code._
+import spoon.reflect.declaration._
 import spoon.reflect.factory.Factory
 import spoon.reflect.reference.{CtTypeReference, CtVariableReference}
 import spoon.support.reflect.code.CtVariableWriteImpl
@@ -16,35 +15,50 @@ import scala.jdk.CollectionConverters._
   * Specifically for handling method refactoring within one class or object
   */
 object MethodRefactorer {
+
+  def main(args: Array[String]): Unit = {
+    val filePath = "src/test/java/com/amp/examples/refactor/TestClass7.java"
+    val x = getAST(filePath)
+    val y = x.getAllTypes.asScala.head
+    val (output, header) = refactorMethodsForClass(filePath)
+    printFullClass(output.get, "temp.java", header)
+  }
   /**
     * Creates a deep copy of the source code and refactors the copy
     * @param filePath - path to input source code file
     * @return - refactored source code
     */
-  def refactorMethodsForClass(filePath: String): Option[CtType[_]] = {
-    var fileNum = 0
-    var outPath = filePath
-    var x: Option[CtType[_]]= None
-    while(MethodRefactorer.isRefactorable(outPath)){
-      x = Some(oneIterationRefactor(outPath))
-      outPath = s"temp${fileNum}.java"
-      StaticAnalysisUtil.printFullClass(x.get, outPath)
-      fileNum += 1
+  def refactorMethodsForClass(filePath: String): (Option[CtType[_]], String) = {
+    val astWithPackage = getAST(filePath)
+    val ast = astWithPackage.getAllTypes.asScala.head
+    var x: Option[CtType[_]] = None
+    while((x.isEmpty && isRefactorable(ast)) || isRefactorable(x.orNull)){
+      x = x match {
+        case None => Some(oneIterationRefactorWithFilePath(filePath))
+        case Some(ctType) => Some(oneIterationRefactorWithModel(ctType))
+      }
     }
-    for(i <- 0 to fileNum){
-      val fw = new File(s"temp${i}.java")
-      fw.delete()
-    }
-    x
+    val header =
+      if(x.nonEmpty && x.get.toStringWithImports.contains("package ")) ""
+      else ast.toStringWithImports.split("\\n").toList.filter(line => line.contains("package")).head
+    (x, header)
   }
 
-  def oneIterationRefactor(filePath: String): CtType[_] = {
-    val ctModelOriginal = getAST(filePath)
-    val ctModelCloned = getAST(filePath)
-    val methods = ctModelOriginal.getElements(methodFilter).asScala.toList
-    val clonedMethods = ctModelCloned.getElements(methodFilter).asScala.toList
+  def oneIterationRefactorWithFilePath(filePath: String): CtType[_] = {
+    val originalCode = getAST(filePath).getAllTypes.asScala.head
+    val clonedCode = Cloner.createClone(originalCode)
+    iterationHelper(originalCode, clonedCode)
+  }
+
+  def oneIterationRefactorWithModel(originalCode: CtType[_]): CtType[_] = {
+    val clonedCode = Cloner.createClone(originalCode)
+    iterationHelper(originalCode, clonedCode)
+  }
+
+  private def iterationHelper(originalCode: CtType[_], clonedCode: CtType[_]): CtType[_] = {
+    val methods = originalCode.getElements(methodFilter).asScala.toList
+    val clonedMethods = clonedCode.getElements(methodFilter).asScala.toList
     val helperMethods = (methods zip clonedMethods).flatMap { case (a, b) => refactorMethod[Any](a, b, methods) }
-    val clonedCode = ctModelCloned.getAllTypes.asScala.head
     val methodCalls = clonedCode.getElements(methodCallFilter).asScala.toList.map(_.getExecutable.getSimpleName)
     helperMethods.foreach(clonedCode.addMethod)
     helperMethods.filterNot{ method =>
@@ -229,10 +243,8 @@ object MethodRefactorer {
     children.isEmpty || children.size() == 1 && Recognizer.recognize[CtInvocation[T]](children.get(0))
   }
 
-  def isRefactorable(filePath: String): Boolean = {
-    val ctModelOriginal = getAST(filePath)
-    ctModelOriginal.getElements(methodFilter).asScala.toList.exists(isRefactorableMethod)
-  }
+  def isRefactorable[T](ctType: CtType[T]): Boolean =
+    ctType.getElements(methodFilter).asScala.toList.exists(isRefactorableMethod)
 
   private def isRefactorableMethod[T](method: CtMethod[T]): Boolean = {
     val blocks = getBlocks[T](method.getBody)

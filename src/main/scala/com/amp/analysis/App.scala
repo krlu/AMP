@@ -26,9 +26,9 @@ object App {
       flags match {
         case "--refactor" =>
           val outputFilePath = args(2)
-          val refactoredClass = refactorMethodsForClass(filePath)
+          val (refactoredClass, header) = refactorMethodsForClass(filePath)
           refactoredClass match {
-            case Some(rfc) => printFullClass(rfc, outputFilePath)
+            case Some(rfc) => printFullClass(rfc, outputFilePath, header)
             case None =>
               System.out.println("Class was not refactorable!")
           }

@@ -1,21 +1,25 @@
 package com.amp.examples.refactor;
 
 
+import java.util.ArrayList;
+
+
 /**
  * Test code 7
  */
 public class TestClass7 {
     public void foo(int i, int j) {
+        ArrayList<String> list = new ArrayList<>();
         int k = 0;
         if (j > 0) {
             fooHelper0(i, j, k);
-        } else
-        if (j == 0) {
-            fooHelper0(i, j, k);
         } else {
-            fooHelper1(i, j, k);
+            if (j == 0) {
+                fooHelper0(i, j, k);
+            } else {
+                fooHelper1(i, j, k);
+            }
         }
-
     }
 
     private void fooHelper0(int i, int j, int k) {

@@ -15,7 +15,7 @@ object StaticAnalysisUtil {
 
   val anyFilter = filter(classOf[CtElement])
   val blockFilter = filter(classOf[CtBlock[Any]])
-  val methodFilter = filter(classOf[CtMethod[Any]])
+  val methodFilter: TypeFilter[CtMethod[Any]] = filter(classOf[CtMethod[Any]])
   val methodCallFilter = filter(classOf[CtInvocation[Any]])
   val returnFilter = filter(classOf[CtReturn[Any]])
   val assignmentFilter = filter(classOf[CtAssignment[Any, Any]])
@@ -55,8 +55,9 @@ object StaticAnalysisUtil {
     * @param rawSyntaxTree - raw AST contained with a model
     * @param outputPath - output file path
     */
-  def printFullClass(rawSyntaxTree: CtType[_], outputPath: String): Unit = {
+  def printFullClass(rawSyntaxTree: CtType[_], outputPath: String, header: String = ""): Unit = {
     val fw = new FileWriter(outputPath)
+    fw.write(header)
     fw.write(rawSyntaxTree.toStringWithImports)
     fw.close()
   }

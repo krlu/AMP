@@ -1,11 +1,12 @@
 package com.amp.examples.refactor;
-
+import java.util.ArrayList;
 
 /**
  * Test code 7
  */
 public class TestClass7 {
     public void foo(int i, int j){
+        ArrayList<String> list = new ArrayList<>();
         int k = 0;
         if(j > 0){
             if(i == 0){

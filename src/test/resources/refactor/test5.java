@@ -9,17 +9,17 @@ public class TestClass5 {
         int k = 0;
         if (j > 0) {
             fooHelper0(i, j, k);
-        } else
-        if (j == 0) {
-            if (i == 0) {
-                fooHelper1(i, k);
-            } else {
-                fooHelper0(i, j, k);
-            }
         } else {
-            fooHelper1(i, k);
+            if (j == 0) {
+                if (i == 0) {
+                    fooHelper1(i, k);
+                } else {
+                    fooHelper0(i, j, k);
+                }
+            } else {
+                fooHelper1(i, k);
+            }
         }
-
     }
 
     private void bar() {
