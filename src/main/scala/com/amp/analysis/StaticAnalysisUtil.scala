@@ -13,6 +13,7 @@ import scala.jdk.CollectionConverters._
 
 object StaticAnalysisUtil {
 
+  val EMPTY_STRING = ""
   val anyFilter = filter(classOf[CtElement])
   val blockFilter = filter(classOf[CtBlock[Any]])
   val methodFilter: TypeFilter[CtMethod[Any]] = filter(classOf[CtMethod[Any]])
@@ -28,7 +29,10 @@ object StaticAnalysisUtil {
   def filter[T <: CtElement](c: Class[T]): TypeFilter[T] = new TypeFilter[T](c)
 
   /**
-    * Obtains the Abstract Syntax Tree of the input java program
+    * Obtains the entire compilation unit (CU) of the input java class
+    * the CU contains the AST for said class as well as file meta-data including
+    *  - package names
+    *  - module names
     * Both can be modified with source code transformation techniques
     * @param inputPath - input file
     * @return pair consisting of
@@ -45,6 +49,15 @@ object StaticAnalysisUtil {
     model
   }
 
+  /**
+    * Obtains the Abstract Syntax Tree of the input java class
+    * Both can be modified with source code transformation techniques
+    * @param inputPath - input file
+    * @tparam T - type name represented by the class
+    * @return pair consisting of
+    *         cu - compilation unit, contains package info and list of imported libraries
+    *         model - the AST of the input program
+    */
   def getRawAST[T](inputPath: String): CtType[T] = {
     val model = getAST(inputPath)
     model.getAllTypes.asScala.toList.head.asInstanceOf[CtType[T]]
@@ -60,6 +73,17 @@ object StaticAnalysisUtil {
     fw.write(header)
     fw.write(rawSyntaxTree.toStringWithImports)
     fw.close()
+  }
+
+  /**
+    * Creates a deep copy of the input AST element
+    * Calls out to a java cloner, because the clone method is inaccessible to the scala compiler (for some reason)
+    * @param ctElement - input AST element
+    * @tparam T - type parameter must be some kind of CtElement
+    * @return T - deep copy of input AST
+    */
+  def createClone[T <: CtElement](ctElement: T): T = {
+    Cloner.createClone(ctElement).asInstanceOf[T]
   }
 }
 

@@ -49,9 +49,9 @@ class ProgramAnalysisTest extends FlatSpec with Matchers {
       val buffer = fromFile(tempFilePath)
       val lines = buffer.getLines.toList
       buffer.close()
-      val m1 = getAST(testFilePath).getAllTypes.asScala.toList.head
-      val m2 = getAST(tempFilePath).getAllTypes.asScala.toList.head
-//      assert(m1 == m2)
+      val m1 = getRawAST(testFilePath)
+      val m2 = getRawAST(testFilePath)
+      assert(m1 == m2)
       assert(m1.toStringWithImports == m2.toStringWithImports)
       assert(lines.size == savedLines.size)
       (lines zip savedLines).foreach {case (l1, l2) =>
