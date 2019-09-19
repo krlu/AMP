@@ -8,17 +8,22 @@ public class TestClass2 {
     public void foo(int i, int j) {
         int k = 0;
         if (j > 0) {
-            fooHelper0(i, j, k);
+            Object[] objects = fooHelper0(i, j, k);
+            i = objects[0];
+            j = objects[1];
         } else {
-            fooHelper0(i, j, k);
+            Object[] objects = fooHelper0(i, j, k);
+            i = objects[0];
+            j = objects[1];
         }
     }
 
-    private void fooHelper0(int i, int j, int k) {
+    private Object[] fooHelper0(int i, int j, int k) {
         int m = 1;
         i += 1;
         j += 1;
         System.out.println(m);
         System.out.println(k);
+        return new Object[]{ i, j };
     }
 }

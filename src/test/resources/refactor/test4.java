@@ -8,9 +8,13 @@ public class TestClass4 {
     public void foo(int i, int j) {
         int k = 0;
         if (j > 0) {
-            fooHelper0(i, j, k);
+            Object[] objects = fooHelper0(i, j, k);
+            i = objects[0];
+            j = objects[1];
         } else {
-            fooHelper0(i, j, k);
+            Object[] objects = fooHelper0(i, j, k);
+            i = objects[0];
+            j = objects[1];
         }
         while (i <= 0) {
             System.out.println("bye");
@@ -18,12 +22,14 @@ public class TestClass4 {
                 System.out.println("ok");
             }
             while (j <= 0) {
-                fooHelper0(i, j, k);
+                Object[] objects = fooHelper0(i, j, k);
+                i = objects[0];
+                j = objects[1];
             }
         }
     }
 
-    private void fooHelper0(int i, int j, int k) {
+    private Object[] fooHelper0(int i, int j, int k) {
         if (i == 0) {
             System.out.println("hi");
         } else {
@@ -33,5 +39,6 @@ public class TestClass4 {
             System.out.println(m);
             System.out.println(k);
         }
+        return new Object[]{ i, j };
     }
 }

@@ -4,16 +4,17 @@ import com.amp.analysis.StaticAnalysisUtil._
 import spoon.reflect.code._
 import spoon.reflect.declaration._
 import spoon.reflect.factory.Factory
-import spoon.reflect.reference.{CtTypeReference, CtVariableReference}
+import spoon.reflect.reference.{CtExecutableReference, CtTypeReference, CtVariableReference}
 import spoon.support.reflect.code.CtVariableWriteImpl
 import spoon.support.reflect.reference.CtLocalVariableReferenceImpl
 
 import scala.jdk.CollectionConverters._
 
 /**
-  * Specifically for handling method refactoring within one class or object
+  * Specifically for handling method refactoring within one java class
   */
 object MethodRefactorer {
+
   /**
     * Creates a deep copy of the source code and refactors the copy
     * @param filePath - path to input source code file
@@ -69,24 +70,26 @@ object MethodRefactorer {
     val clonedBlocks = getBlocks[T](methodClone.getBody)
     val uniqueBlocks = blocks.distinct
     val uniqueClonedBlocks = clonedBlocks.distinct
-    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 && !isSingleMethod(block)}
-    val uniqueClonedMultiBlocks = uniqueClonedBlocks.filter{ block => blocks.count(_ == block) > 1 && !isSingleMethod(block)}
+    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 &&
+      !isAtomicBlock(block) && !block.toString.toLowerCase.contains("helper")}
+    val uniqueClonedMultiBlocks = uniqueClonedBlocks.filter{ block => blocks.count(_ == block) > 1 &&
+      !isAtomicBlock(block) && !block.toString.toLowerCase.contains("helper")}
     val blockToMethod: Map[String, CtMethod[T]] = uniqueMultiBlocks.indices.map{ i =>
       val block = uniqueClonedMultiBlocks(i)
-      // get all variables defined in block
-      val innerScopeVars = block.getElements(localVarFilter).asScala.toList.map(_.getReference.getSimpleName)
-      // get all variables defined or used in block and outside block
-      val allScopeVars = List(variableReferenceFilter, variableReadFilter, variableWriteFilter)
-        .flatMap(block.getElements(_).asScala.toList)
-        .filterNot(e => Recognizer.recognize[CtFieldRead[T]](e))
-      // filter out variables defined in block, remaining variables to be used as params to new method
-      val relevantVarNames: List[(CtTypeReference[T], String)] = allScopeVars
-        .filterNot(e => innerScopeVars.contains(e.toString))
-        .map(e => (e.getReferencedTypes.asScala.toList.head.asInstanceOf[CtTypeReference[T]], e.toString))
-        .distinct.sortBy(_._2)
+      val relevantVarNames: List[(CtTypeReference[T], String)] = getRelevantVariables(block)
       block.toString -> {
         // check if desired helper method already exists, if so use that, otherwise create brand new one
-        val existingMethodOpt = allMethods.find(_.getBody == uniqueMultiBlocks(i))
+        val existingMethodOpt = allMethods.find{m =>
+          val body = StaticAnalysisUtil.createClone(m.getBody)
+          if(body.getStatements.isEmpty) false // if for some reason method or block is empty
+          else {
+            val lastStatement = body.getStatements.asScala.toList.last
+            // handle case where we added additional return statement to the helper method
+            if (Recognizer.recognize[CtReturn[T]](lastStatement) && body != uniqueMultiBlocks(i))
+              body.removeStatement(lastStatement)
+            body == uniqueMultiBlocks(i)
+          }
+        }
         existingMethodOpt match {
           case Some(m) => m
           case None =>  createHelperMethod[T](uniqueMultiBlocks(i), relevantVarNames,
@@ -111,11 +114,13 @@ object MethodRefactorer {
     * @param helperMethod - new helper method
     */
   private def updateBlocks[T](clonedBlock: CtBlock[T], originalBlock: CtBlock[T], helperMethod: CtMethod[T]): Unit = {
-    clonedBlock.getStatements.asScala.toList.foreach(clonedBlock.removeStatement)
     val factory = clonedBlock.getFactory
-    val executable = factory.createExecutableReference()
+    val assignedVars: Seq[CtAssignment[T, T]] = List(filter(classOf[CtAssignment[T, T]]))
+      .flatMap(originalBlock.getElements(_).asScala.toList).distinct
+    clonedBlock.getStatements.asScala.toList.foreach(clonedBlock.removeStatement)
+    val executable: CtExecutableReference[T] = factory.createExecutableReference()
     executable.setSimpleName(helperMethod.getSimpleName)
-    val methodCall = clonedBlock.getFactory.createInvocation()
+    val methodCall: CtInvocation[T] = clonedBlock.getFactory.createInvocation()
     methodCall.setExecutable(executable)
     val variables = helperMethod.getParameters.asScala.toList.map{ param =>
       val varRef: CtVariableReference[T] = new CtLocalVariableReferenceImpl()
@@ -125,7 +130,47 @@ object MethodRefactorer {
       varWrite
     }
     variables.foreach(methodCall.addArgument)
-    clonedBlock.addStatement(methodCall)
+    val newObj = factory.createLocalVariable[T]()
+    val newType = factory.createTypeReference[T]()
+    newType.setSimpleName("Object[]")
+    newObj.setAssignment(StaticAnalysisUtil.createClone(methodCall))
+    newObj.setSimpleName("objects")
+    newObj.setType(newType)
+    clonedBlock.addStatement(newObj)
+    addAssignment[T](clonedBlock, assignedVars, newObj)
+  }
+
+  @scala.annotation.tailrec
+  private def addAssignment[T](block: CtBlock[T], assignedVars: Seq[CtAssignment[T, T]], localVar: CtLocalVariable[T],  i: Int = 0): Unit = {
+    if(assignedVars.nonEmpty){
+      val factory = block.getFactory
+      val refClone = StaticAnalysisUtil.createClone(localVar.getReference)
+      refClone.setSimpleName(s"objects[$i]")
+      val expr = factory.createVariableRead[T](refClone, false)
+      val assignment = factory.createAssignment[T, T]()
+      assignment.setAssigned(assignedVars.head.getAssigned)
+      assignment.setAssignment(expr)
+      block.addStatement(assignment)
+      addAssignment(block, assignedVars.tail, localVar, i + 1)
+    }
+  }
+
+  private def getRelevantVariables[T](block: CtBlock[T]): List[(CtTypeReference[T], String)] = {
+    // get all variables defined in block
+    val innerScopeVars = block.getElements(localVarFilter).asScala.toList.map(_.getReference.getSimpleName)
+    // get all variables defined or used in block and outside block
+    val allScopeVars = List(variableReferenceFilter, variableReadFilter, variableWriteFilter)
+      .flatMap(block.getElements(_).asScala.toList)
+      .filterNot(e => Recognizer.recognize[CtFieldRead[T]](e))
+    // filter out variables defined in block, remaining variables to be used as params to new method
+    val relevantVarNames: List[(CtTypeReference[T], String)] = allScopeVars
+      .filterNot(e => innerScopeVars.contains(e.toString))
+      .flatMap{ e =>
+        val types = e.getReferencedTypes.asScala.toList
+        if(types.nonEmpty) Some((types.head.asInstanceOf[CtTypeReference[T]], e.toString)) else None
+      }
+      .distinct.sortBy(_._2)
+    relevantVarNames
   }
 
   /**
@@ -146,18 +191,18 @@ object MethodRefactorer {
       param.setType(typeRef)
       method.addParameter[CtExecutable[T]](param)
     }
-    if(returnType.getSimpleName != "void") {
-      var paramsToReturn = List.empty[CtVariableReference[T]]
-      block.getElements(assignmentFilter).asScala.toList.foreach { a =>
-        paramsToReturn = paramsToReturn :+ a.getAssigned.asInstanceOf[CtVariableAccess[T]].getVariable
-      }
-      val returnStatement = factory.createReturn[T]()
-      val variables = factory.createLiteralArray(paramsToReturn.toArray).asInstanceOf[CtExpression[T]]
-      returnStatement.setReturnedExpression(variables)
-      block.addStatement(returnStatement)
+    var paramsToReturn = List.empty[Object]
+    block.getElements(assignmentFilter).asScala.toList.distinct.foreach { a =>
+      paramsToReturn = paramsToReturn :+ a.getAssigned.asInstanceOf[CtVariableAccess[T]].getVariable
     }
-    method.setBody(block)
+    val returnStatement = factory.createReturn[T]()
+    val variables = factory.createLiteralArray(paramsToReturn.toArray).asInstanceOf[CtExpression[T]]
+    returnStatement.setReturnedExpression(variables)
+    val cloneBody = StaticAnalysisUtil.createClone(block)
+    cloneBody.addStatement(returnStatement)
+    method.setBody(cloneBody)
     method.addModifier(ModifierKind.PRIVATE)
+    returnType.setSimpleName("Object[]")
     method.setType(returnType)
     method
   }
@@ -220,17 +265,18 @@ object MethodRefactorer {
     * @param codeBlock - input code block
     * @return - true if and only if input block is child block
     */
-  private def isChildBlock[T](codeBlock: CtBlock[T]): Boolean =
-    codeBlock.getElements(blockFilter).asScala.toList.size <= 1
+  private def isChildBlock[T](codeBlock: CtBlock[T]): Boolean = codeBlock.getElements(blockFilter).size() <= 1
 
   /**
-    * Checks if block only has one direct child and checks if that child is of type CtMethod
+    * Checks if block only has one direct child and checks if that child is of type Method or LocalVariable
     * @param codeBlock - input code block
-    * @return true if has no children or a single method call
+    * @return true if and only if condition described above is satisfied
     */
-  private def isSingleMethod[T](codeBlock: CtBlock[T]): Boolean = {
+  private def isAtomicBlock[T](codeBlock: CtBlock[T]): Boolean = {
     val children = codeBlock.getDirectChildren
-    children.isEmpty || children.size() == 1 && Recognizer.recognize[CtInvocation[T]](children.get(0))
+    children.isEmpty || children.size() == 1 &&
+      (Recognizer.recognize[CtInvocation[T]](children.get(0))
+        || Recognizer.recognize[CtLocalVariable[T]](children.get(0)))
   }
 
   private def isRefactorable[T](ctType: CtType[T]): Boolean =
@@ -239,7 +285,7 @@ object MethodRefactorer {
   private def isRefactorableMethod[T](method: CtMethod[T]): Boolean = {
     val blocks = getBlocks[T](method.getBody)
     val uniqueBlocks = blocks.distinct
-    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 && !isSingleMethod(block)}
+    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 && !block.toString.toLowerCase.contains("helper")}
     uniqueMultiBlocks.nonEmpty
   }
 }
