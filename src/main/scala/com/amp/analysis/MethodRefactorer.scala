@@ -11,15 +11,10 @@ import spoon.support.reflect.reference.CtLocalVariableReferenceImpl
 import scala.jdk.CollectionConverters._
 
 /**
-  * Specifically for handling method refactoring within one class or object
+  * Specifically for handling method refactoring within one java class
   */
 object MethodRefactorer {
 
-  def main(args: Array[String]): Unit = {
-    val path = "src/test/java/com/amp/examples/refactor/TestClass7.java"
-    val x = refactorMethodsForClass(path)
-    println(x)
-  }
   /**
     * Creates a deep copy of the source code and refactors the copy
     * @param filePath - path to input source code file
@@ -75,8 +70,10 @@ object MethodRefactorer {
     val clonedBlocks = getBlocks[T](methodClone.getBody)
     val uniqueBlocks = blocks.distinct
     val uniqueClonedBlocks = clonedBlocks.distinct
-    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 && !isSingleMethod(block)}
-    val uniqueClonedMultiBlocks = uniqueClonedBlocks.filter{ block => blocks.count(_ == block) > 1 && !isSingleMethod(block)}
+    val uniqueMultiBlocks = uniqueBlocks.filter{ block => blocks.count(_ == block) > 1 &&
+      !isAtomicBlock(block) && !block.toString.toLowerCase.contains("helper")}
+    val uniqueClonedMultiBlocks = uniqueClonedBlocks.filter{ block => blocks.count(_ == block) > 1 &&
+      !isAtomicBlock(block) && !block.toString.toLowerCase.contains("helper")}
     val blockToMethod: Map[String, CtMethod[T]] = uniqueMultiBlocks.indices.map{ i =>
       val block = uniqueClonedMultiBlocks(i)
       val relevantVarNames: List[(CtTypeReference[T], String)] = getRelevantVariables(block)
@@ -84,11 +81,14 @@ object MethodRefactorer {
         // check if desired helper method already exists, if so use that, otherwise create brand new one
         val existingMethodOpt = allMethods.find{m =>
           val body = StaticAnalysisUtil.createClone(m.getBody)
-          val lastStatement = body.getStatements.asScala.toList.last
-          // handle case where we added additional return statement to the helper method
-          if(Recognizer.recognize[CtReturn[T]](lastStatement) && body != uniqueMultiBlocks(i))
-            body.removeStatement(lastStatement)
-          body == uniqueMultiBlocks(i)
+          if(body.getStatements.isEmpty) false // if for some reason method or block is empty
+          else {
+            val lastStatement = body.getStatements.asScala.toList.last
+            // handle case where we added additional return statement to the helper method
+            if (Recognizer.recognize[CtReturn[T]](lastStatement) && body != uniqueMultiBlocks(i))
+              body.removeStatement(lastStatement)
+            body == uniqueMultiBlocks(i)
+          }
         }
         existingMethodOpt match {
           case Some(m) => m
@@ -137,17 +137,21 @@ object MethodRefactorer {
     newObj.setSimpleName("objects")
     newObj.setType(newType)
     clonedBlock.addStatement(newObj)
-    addAssignment[T](clonedBlock, assignedVars)
+    addAssignment[T](clonedBlock, assignedVars, newObj)
   }
 
   @scala.annotation.tailrec
-  private def addAssignment[T](block: CtBlock[T], assignedVars: Seq[CtAssignment[T, T]]): Unit = {
+  private def addAssignment[T](block: CtBlock[T], assignedVars: Seq[CtAssignment[T, T]], localVar: CtLocalVariable[T],  i: Int = 0): Unit = {
     if(assignedVars.nonEmpty){
       val factory = block.getFactory
+      val refClone = StaticAnalysisUtil.createClone(localVar.getReference)
+      refClone.setSimpleName(s"objects[$i]")
+      val expr = factory.createVariableRead[T](refClone, false)
       val assignment = factory.createAssignment[T, T]()
       assignment.setAssigned(assignedVars.head.getAssigned)
+      assignment.setAssignment(expr)
       block.addStatement(assignment)
-      addAssignment(block, assignedVars.tail)
+      addAssignment(block, assignedVars.tail, localVar, i + 1)
     }
   }
 
@@ -261,15 +265,14 @@ object MethodRefactorer {
     * @param codeBlock - input code block
     * @return - true if and only if input block is child block
     */
-  private def isChildBlock[T](codeBlock: CtBlock[T]): Boolean =
-    codeBlock.getElements(blockFilter).asScala.toList.size <= 1
+  private def isChildBlock[T](codeBlock: CtBlock[T]): Boolean = codeBlock.getElements(blockFilter).size() <= 1
 
   /**
-    * Checks if block only has one direct child and checks if that child is of type CtMethod
+    * Checks if block only has one direct child and checks if that child is of type Method or LocalVariable
     * @param codeBlock - input code block
-    * @return true if has no children or a single method call
+    * @return true if and only if condition described above is satisfied
     */
-  private def isSingleMethod[T](codeBlock: CtBlock[T]): Boolean = {
+  private def isAtomicBlock[T](codeBlock: CtBlock[T]): Boolean = {
     val children = codeBlock.getDirectChildren
     children.isEmpty || children.size() == 1 &&
       (Recognizer.recognize[CtInvocation[T]](children.get(0))
