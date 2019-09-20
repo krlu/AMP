@@ -4,9 +4,6 @@ package com.amp.examples.refactor;
 /**
  * Test code 5
  */
-/**
- * Test code 5
- */
 public class TestClass5 {
     public void foo(int i, int j) {
         int k = 0;

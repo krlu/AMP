@@ -21,8 +21,6 @@ object App {
     else {
       val filePath = args(1)
       val ctModel = getAST(filePath)
-      val elements = ctModel.getElements[CtMethod[Any]](methodFilter).asScala.toList
-      val x = elements.head.asInstanceOf[CtMethod[Double]]
       flags match {
         case "--refactor" =>
           val outputFilePath = args(2)
@@ -36,8 +34,10 @@ object App {
           val outputFilePath = args(2)
           printFullClass(ctModel.getAllTypes.asScala.head, outputFilePath)
         case "--analyze" =>
-          val estimatedOutputs = MethodIOAnalyzer.analyzeCodeBlock(x)
-          println(estimatedOutputs)
+          ctModel.getElements[CtMethod[Any]](methodFilter).asScala.toList.foreach { method =>
+            val estimatedOutputs = MethodIOAnalyzer.analyzeCodeBlock(method)
+            println(estimatedOutputs)
+          }
         case _ =>
           println(usageInfo)
       }

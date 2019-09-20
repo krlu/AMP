@@ -1,5 +1,5 @@
 package com.amp.analysis
-import java.io.FileWriter
+import java.io.{File, FileWriter}
 
 import spoon.Launcher
 import spoon.reflect.CtModel
@@ -40,6 +40,7 @@ object StaticAnalysisUtil {
     *         model - the AST of the input program
     */
   def getAST(inputPath: String): CtModel = {
+    validateFileExtension(inputPath)
     val launcher = new Launcher
     launcher.addInputResource(inputPath)
     launcher.getEnvironment.setAutoImports(true)
@@ -69,10 +70,16 @@ object StaticAnalysisUtil {
     * @param outputPath - output file path
     */
   def printFullClass(rawSyntaxTree: CtType[_], outputPath: String, header: String = ""): Unit = {
+    validateFileExtension(outputPath)
     val fw = new FileWriter(outputPath)
     fw.write(header)
     fw.write(rawSyntaxTree.toStringWithImports)
     fw.close()
+  }
+
+  private def validateFileExtension(path: String): Unit = {
+    if(path.split("\\.").last != "java")
+      throw new IllegalArgumentException(s"Required path with .java file extension but found ${path}")
   }
 
   /**
