@@ -23,7 +23,7 @@ First run the following
 > sbt pack
 ```
 This will create an executable batch script that runs an accompanying jar.\
-Batch script is located in `amp/target/pack/bin/app.bat`
+Batch script is located in `amp/target/pack/bin/app.bat`\
 To see command line usage, simply run `app --help`
 
 You can run the batch script with the following arguments: 
