@@ -14,7 +14,7 @@ class ProgramAnalysisTest extends FlatSpec with Matchers {
 
   private val inputTestPath = "src/test/java/com/amp/examples"
 
-  "Program output Analyzer" should "output correct analysis in near constant time" in {
+  "Method IO analyzer" should "output correct analysis in near constant time" in {
     import com.amp.analysis.MethodIOAnalyzer._
     val filePath = s"$inputTestPath/ioestimation/TestClass.java"
     val ctModel = getAST(filePath)
@@ -35,7 +35,7 @@ class ProgramAnalysisTest extends FlatSpec with Matchers {
     assert(runtime1 * 10 < runtime2)
   }
 
-  "Program output Analyzer" should "support refactoring method" in {
+  "Method Refactorer" should "support refactoring method" in {
     import com.amp.analysis.MethodRefactorer._
     for(testNum <- 1 to 7) {
       val filePath = s"$inputTestPath/refactor/TestClass$testNum.java"

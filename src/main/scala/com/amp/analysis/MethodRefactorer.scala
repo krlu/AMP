@@ -140,6 +140,14 @@ object MethodRefactorer {
     addAssignment[T](clonedBlock, assignedVars, newObj)
   }
 
+  /**
+    * Performed with tail recursion because for some reason crashes when done iteratively
+    * @param block - code block to be transformed
+    * @param assignedVars variables we want to assigned to
+    * @param localVar object array returned from newly generated helper method
+    * @param i - index of object array
+    * @tparam T - generic type params
+    */
   @scala.annotation.tailrec
   private def addAssignment[T](block: CtBlock[T], assignedVars: Seq[CtAssignment[T, T]], localVar: CtLocalVariable[T],  i: Int = 0): Unit = {
     if(assignedVars.nonEmpty){
